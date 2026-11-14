@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hub Pribadi</title>
+<meta name="theme-color" content="#cf4425">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hub Pribadi">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app">
+  <aside class="nav" id="nav" aria-label="Navigasi utama"></aside>
+  <div class="content">
+    <header class="top">
+      <div class="ttl"><div class="kicker" id="kicker"></div><h1 id="title">Beranda</h1></div>
+      <div class="hr"><button class="btn ghost sm" id="syncst" type="button" data-act="sync-now" hidden></button><button class="btn primary sm" id="fab" type="button" data-act="fab">+ Tambah</button><button class="btn ghost sm gear" type="button" data-act="go" data-id="pengaturan" aria-label="Pengaturan">Pengaturan</button></div>
+    </header>
+    <main id="main"></main>
+  </div>
+  <nav class="tabbar" id="tabbar" aria-label="Navigasi utama"></nav>
+  <div class="dock">
+    <div id="ai-out" aria-live="polite"></div>
+    <form id="cmd" autocomplete="off">
+      <input id="cmdin" type="text" placeholder="Tulis perintah atau tanya sesuatu" aria-label="Asisten: perintah atau pertanyaan" enterkeyhint="send">
+      <button class="btn primary" type="submit">Kirim</button>
+    </form>
+  </div>
+</div>
+<dialog id="dlg"></dialog>
+<div id="toast" role="status"></div>
+<noscript>Aplikasi ini membutuhkan JavaScript.</noscript>
+<script src="app.js"></script>
+</body>
+</html>
