@@ -87,3 +87,11 @@ Kuliah (mata kuliah per semester, tugas dan ujian dengan tenggat dan rencana men
 ## Catatan pengujian
 
 Sudah diuji otomatis di Chromium (tampilan desktop dan HP) dengan lingkungan Vercel, Upstash, dan Gemini **tiruan** di komputer lokal: dua perangkat saling sinkron, penggabungan perubahan, konflik, penghapusan, mode offline, kode salah, enkripsi (server tidak memuat teks asli), dan jalur Gemini lewat server. Belum diuji di Vercel sungguhan, Upstash sungguhan, Gemini sungguhan, ataupun iPhone dan Android sungguhan. Kalau ada langkah yang tidak berjalan seperti yang tertulis, catat pesan galatnya dan kabari supaya diperbaiki.
+
+## Pembaruan: acara kalender, chat lengkap, tampilan baru
+
+- **Acara kalender**: tombol "+ Tambah" di halaman Kalender, atau tombol "+ Acara" di tiap hari. Bisa berulang (harian, mingguan, bulanan, tahunan), beberapa hari, dengan jam dan tempat.
+- **Chat di bagian bawah** sekarang bisa mengelola hampir semua fitur: akun dan saldo awal, saldo sekarang, transaksi, acara, mata kuliah, jadwal kelas, tugas (tambah, selesai, hapus), materi, target riset dan progresnya, bimbingan, libur, semester aktif, anggaran, target tabungan, utang dan piutang, tagihan, investasi, kategori, dan membuka halaman. Semua perubahan tampil sebagai pratinjau dulu, lalu disimpan setelah menekan Simpan.
+- Contoh: `akun bca saldo awalnya 1 juta`, `saldo bca sekarang 1,9 juta`, `rapat kelompok besok jam 14 di perpus`, `acara senam tiap senin jam 6`, `jadwal statistika selasa 10.00-11.40 ruang B2`, `selesai tugas laporan`, `anggaran makan 800rb`, `utang ke Budi 50rb`.
+- Kalau Gemini disambungkan, kalimat bebas atau beberapa perintah sekaligus juga dipahami (Gemini memilih dari daftar aksi yang sama, aplikasi tetap meminta konfirmasi).
+- Tampilan dirombak total (nuansa buku catatan, mode gelap otomatis). Setelah deploy, muat ulang sekali atau dua kali supaya cache lama (v4) terganti.

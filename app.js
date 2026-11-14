@@ -29,7 +29,7 @@ const rel = s => { if (!s) return ''; const d = diffDays(s, today()); if (d === 
 
 /* ---------- penyimpanan ---------- */
 const COLLS = ['courses', 'tasks', 'materials', 'schedule', 'holidays', 'needs', 'ideas', 'milestones', 'literature', 'bimbingan',
-  'accounts', 'categories', 'transactions', 'investments', 'budgets', 'goals', 'debts', 'bills', 'trueExp', 'aiLog'];
+  'events', 'accounts', 'categories', 'transactions', 'investments', 'budgets', 'goals', 'debts', 'bills', 'trueExp', 'aiLog'];
 const DEF_SET = { sem: 1, semStart: '', semEnd: '', created: '', lastBackup: '', lastAcc: '', geminiKey: '', geminiModel: 'gemini-flash-latest', useGemini: false, geminiMode: 'direct', geminiNotes: '', shareSummary: false, syncOn: false, syncSecret: '', syncRev: 0 };
 const S = { settings: { ...DEF_SET }, tomb: {} };
 COLLS.forEach(k => S[k] = []);
@@ -307,7 +307,24 @@ function inSemFilter(courseId) {
 }
 
 /* kalender gabungan */
-const TYPES = { kelas: ['Kuliah', '#2f7fb8'], tugas: ['Tenggat tugas', '#d9822b'], kerjakan: ['Dikerjakan', '#5a7bd8'], ujian: ['Ujian', '#c0504d'], riset: ['Riset', '#0f7b6c'], bimbingan: ['Bimbingan', '#7a5ea8'], tagihan: ['Tagihan', '#8a6d3b'], libur: ['Libur', '#7d8590'] };
+const TYPES = { kelas: ['Kuliah', '#2f7fb8'], tugas: ['Tenggat tugas', '#d9822b'], kerjakan: ['Dikerjakan', '#5a7bd8'], ujian: ['Ujian', '#c0504d'], riset: ['Riset', '#0f7b6c'], bimbingan: ['Bimbingan', '#7a5ea8'], tagihan: ['Tagihan', '#8a6d3b'], libur: ['Libur', '#7d8590'], acara: ['Acara', '#c2410c'] };
+function evStarts(e, x) {
+  if (!e.date || x < e.date) return false;
+  if (e.until && x > e.until) return false;
+  switch (e.repeat) {
+    case 'harian': return true;
+    case 'mingguan': return weekdayIdx(x) === weekdayIdx(e.date);
+    case 'bulanan': return x.slice(8) === e.date.slice(8);
+    case 'tahunan': return x.slice(5) === e.date.slice(5);
+    default: return x === e.date;
+  }
+}
+function evOccurs(e, d) {
+  if (!e.date) return false;
+  const span = e.endDate && e.endDate > e.date ? Math.min(60, Math.round(diffDays(e.endDate, e.date))) : 0;
+  for (let k = 0; k <= span; k++) if (evStarts(e, addDays(d, -k))) return true;
+  return false;
+}
 function eventsOn(d, useFilter = true) {
   const ev = []; const st = S.settings;
   const hol = S.holidays.find(h => d >= h.start && d <= (h.end || h.start));
@@ -320,6 +337,7 @@ function eventsOn(d, useFilter = true) {
       ev.push({ type: 'kelas', title: co.name, sub: c.room || '', time: c.start || '', end: c.end || '', ref: ['schedule', c.id] });
     });
   }
+  S.events.forEach(e => { if (evOccurs(e, d)) ev.push({ type: 'acara', title: e.title, sub: [e.place || '', e.repeat && e.repeat !== 'tidak' ? 'berulang ' + e.repeat : ''].filter(Boolean).join(' · '), time: e.time || '', end: e.endTime || '', ref: ['events', e.id] }); });
   S.tasks.filter(t => t.due === d).forEach(t => ev.push({ type: t.kind === 'ujian' ? 'ujian' : 'tugas', title: t.title, sub: courseById(t.course)?.name || '', time: '', done: t.done, ref: ['tasks', t.id] }));
   S.tasks.filter(t => !t.done && t.work === d).forEach(t => ev.push({ type: 'kerjakan', title: 'Kerjakan: ' + t.title, sub: [courseById(t.course)?.name || '', t.due ? 'tenggat ' + fmtDate(t.due) : ''].filter(Boolean).join(' · '), time: t.workStart || '', end: t.workEnd || '', ref: ['tasks', t.id] }));
   S.milestones.filter(m => m.due === d).forEach(m => ev.push({ type: 'riset', title: m.title, sub: `${m.pct || 0}%`, done: (m.pct || 0) >= 100, ref: ['milestones', m.id] }));
@@ -600,6 +618,7 @@ function answerQuery(text) {
 function localParse(text) {
   const t = text.trim(); const low = t.toLowerCase();
   if (!t) return null;
+  try { const ag = localAgent(t); if (ag) return ag; } catch (e) { console.warn('agen', e); }
   const isQ = /\?\s*$/.test(t) || /^(berapa|lihat|cek|apa|daftar|list|sisa|total)\b/.test(low) || /\b(berapa|apa saja)\b/.test(low) || /^(tugas|deadline)\s+(minggu ini|hari ini|besok|bulan ini)\s*$/.test(low) || /^saldo\b/.test(low);
   if (isQ) { const a = answerQuery(t); if (a) return a; }
   let m;
@@ -717,6 +736,8 @@ ${systemContext()}
 
 Skema: {"intent":"tx|task|idea|need|ask|unknown","type":"out|in|tf","date":"YYYY-MM-DD","amount":angka rupiah,"acc":"nama akun persis dari daftar atau kosong","to":"akun tujuan untuk transfer atau kosong","cat":"nama kategori persis dari daftar atau kosong","note":"keterangan singkat","fee":angka biaya admin atau 0,"title":"judul tugas atau ide","course":"nama mata kuliah persis atau kosong","due":"tenggat YYYY-MM-DD atau kosong","workDate":"tanggal rencana mengerjakan tugas YYYY-MM-DD atau kosong","taskKind":"tugas|ujian|kuis|praktikum"}
 Aturan: 18rb=18000, 1,5jt=1500000. Ikuti penjelasan sistem di atas, termasuk nama lain akun, kata kunci kategori, dan catatan pengguna. Jika tanggal transaksi tidak disebut, pakai tanggal hari ini. Untuk tugas, kosongkan tanggal yang tidak disebut. Pakai intent "ask" untuk pertanyaan tentang data pengguna (saldo, total pengeluaran, daftar tugas, jadwal, dan sebagainya). Jangan mengarang akun atau kategori yang tidak ada di daftar.
+Jika perintah meminta mengubah data selain mencatat SATU transaksi atau SATU tugas biasa (misalnya mengubah saldo awal akun, menambah akun, acara kalender, mata kuliah, jadwal kelas, anggaran, utang, tagihan, investasi, target tabungan, progres riset, menandai tugas selesai, menghapus sesuatu), atau meminta beberapa hal sekaligus, pakai intent "actions" dan isi "actions":[{"name":"...","args":{...}}] memakai nama aksi dari daftar berikut. Tanggal YYYY-MM-DD, jam HH:MM, nominal angka rupiah. Isi hanya argumen yang disebut pengguna.
+${AG_DOC}
 Perintah: ${JSON.stringify(text)}`;
   const j = await geminiCall({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } });
   const raw = gemText(j).replace(/^```json\s*|^```\s*|```$/gm, '').trim();
@@ -760,6 +781,7 @@ function byName(list, name) {
 function mapGemini(o) {
   const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
   if (o.intent === 'ask') return { kind: 'ask' };
+  if (o.intent === 'actions' && Array.isArray(o.actions)) return makePlan(o.actions.filter(x => x && x.name).map(x => [x.name, x.args || {}]));
   if (o.intent === 'tx') {
     const type = ['in', 'out', 'tf'].includes(o.type) ? o.type : 'out';
     const amount = Number(o.amount) || 0; if (!amount) return null;
@@ -891,6 +913,25 @@ function editClass(id, prefill) {
     msg: () => msg
   }, prefill);
 }
+function editEvent(id, prefill) {
+  editEntity('events', id, {
+    title: 'acara', defaults: { date: UI.calDate || today(), time: '', endTime: '', repeat: 'tidak' },
+    fields: [
+      { k: 'title', label: 'Nama acara', req: true, wide: true, ph: 'Contoh: Rapat kelompok, Seminar, Les bahasa' },
+      { k: 'date', label: 'Tanggal', type: 'date', req: true },
+      { k: 'endDate', label: 'Sampai tanggal (acara beberapa hari)', type: 'date' },
+      { k: 'time', label: 'Mulai jam', type: 'time' },
+      { k: 'endTime', label: 'Selesai jam', type: 'time' },
+      { k: 'place', label: 'Tempat', wide: true },
+      { k: 'repeat', label: 'Berulang', type: 'select', opts: [{ v: 'tidak', l: 'Tidak berulang' }, { v: 'harian', l: 'Tiap hari' }, { v: 'mingguan', l: 'Tiap minggu' }, { v: 'bulanan', l: 'Tiap bulan' }, { v: 'tahunan', l: 'Tiap tahun' }] },
+      { k: 'until', label: 'Berulang sampai (opsional)', type: 'date', show: v => v.repeat && v.repeat !== 'tidak' },
+      { k: 'note', label: 'Catatan', type: 'textarea', wide: true }
+    ],
+    check: v => (v.endDate && v.endDate < v.date) ? 'Tanggal selesai tidak boleh sebelum tanggal mulai' : (v.time && v.endTime && v.endTime < v.time) ? 'Jam selesai tidak boleh sebelum jam mulai' : ''
+  }, prefill);
+}
+ACT['event-new'] = () => editEvent(null);
+ACT['cal-add'] = el => editEvent(null, { date: el.dataset.id });
 function editHoliday(id) {
   editEntity('holidays', id, {
     title: 'hari libur', defaults: { start: today() },
@@ -1036,7 +1077,7 @@ function viewBeranda() {
   if (!S.courses.length && !S.accounts.length) {
     h += panel('Mulai dari sini', `<div class="stack"><p class="mute">Isi tiga hal ini supaya Beranda terisi. Sisanya bisa menyusul sambil dipakai.</p>
       <div class="row">${btn('Atur semester', 'sem-edit')}${btn('Tambah mata kuliah', 'course-new', null, 'primary')}${btn('Tambah akun keuangan', 'go', 'keuangan')}</div>
-      <p class="small mute">Untuk mencatat cepat, ketik di kolom paling atas, misalnya <b>kopi 15rb dana</b> atau <b>tugas laporan deadline Jumat</b>.</p></div>`);
+      <p class="small mute">Untuk mencatat cepat, ketik di kolom obrolan di bawah, misalnya <b>akun bca saldo awalnya 1 juta</b>, <b>kopi 15rb dana</b>, atau <b>rapat kelompok besok jam 14</b>.</p></div>`);
   }
   const lastB = S.settings.lastBackup;
   if ((S.transactions.length + S.tasks.length > 5) && (!lastB || diffDays(T, lastB) > 14)) {
@@ -1060,7 +1101,7 @@ ACT['go-kuliah-tugas'] = () => { UI.tab = 'kuliah'; UI.sub.kuliah = 'tugas'; ren
 ACT['course-new'] = () => editCourse(null);
 ACT['open-ref'] = el => {
   const [coll, id] = el.dataset.id.split(':');
-  ({ tasks: editTask, milestones: editMilestone, bimbingan: editBim, bills: editBill, trueExp: editTrue, holidays: editHoliday, schedule: editClass })[coll]?.(id);
+  ({ events: editEvent, tasks: editTask, milestones: editMilestone, bimbingan: editBim, bills: editBill, trueExp: editTrue, holidays: editHoliday, schedule: editClass })[coll]?.(id);
 };
 
 /* ================= VIEW: Kalender ================= */
@@ -1087,7 +1128,7 @@ function viewKalender() {
   const label = mode === 'bulan' ? fmtMonth(d.slice(0, 7)) : mode === 'minggu' ? `${fmtDate(startOfWeek(d), { day: 'numeric', month: 'short' })} sampai ${fmtDate(addDays(startOfWeek(d), 6), { day: 'numeric', month: 'short', year: 'numeric' })}` : fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const filters = `<div class="chips">${Object.entries(TYPES).map(([k, [l, c]]) => `<button type="button" class="chip dot ${UI.calOff[k] ? 'off' : 'on'}" style="--c:${c}" aria-pressed="${!UI.calOff[k]}" ${A('cal-filter', k)}>${l}</button>`).join('')}</div>`;
   let body = '';
-  const dayList = (x, withHead) => { const ev = eventsOn(x); return (withHead ? `<div class="sec" style="margin-top:12px">${esc(fmtDate(x, { weekday: 'long', day: 'numeric', month: 'long' }))}${x === today() ? ' · hari ini' : ''}</div>` : '') + (ev.length ? ev.map(e => eventRow(e)).join('') : `<p class="small mute" style="padding:6px 0">Tidak ada agenda.</p>`); };
+  const dayList = (x, withHead) => { const ev = eventsOn(x); return `<div class="dayhead${withHead ? '' : ' solo'}">${withHead ? `<span>${esc(fmtDate(x, { weekday: 'long', day: 'numeric', month: 'long' }))}${x === today() ? ' · hari ini' : ''}</span>` : '<span></span>'}<button type="button" class="btn sm" ${A('cal-add', x)}>+ Acara</button></div>` + (ev.length ? ev.map(e => eventRow(e)).join('') : `<p class="small mute" style="padding:6px 0">Tidak ada agenda.</p>`); };
   if (mode === 'bulan') {
     body = monthGrid(d.slice(0, 7), x => { const types = [...new Set(eventsOn(x).map(e => e.type))]; return types.length ? `<span class="dots">${types.slice(0, 5).map(t => `<i style="--c:${TYPES[t][1]}"></i>`).join('')}</span>` : ''; }, 'cal-pick', d) + `<div style="margin-top:8px">${dayList(d, true)}</div>`;
   } else if (mode === 'minggu') {
@@ -1853,10 +1894,14 @@ function renderAIOut() {
     const t = a.task; h = `<div class="aiout"><div class="big">${esc(cap(t.kind))} baru: ${esc(t.title)}</div><div class="sub">${t.course ? esc(courseById(t.course)?.name || '') : 'tanpa mata kuliah'} · ${t.due ? 'tenggat ' + esc(fmtDate(t.due)) + ' (' + rel(t.due) + ')' : 'tanpa tenggat'}</div>${t.work ? `<div class="sub">Dikerjakan ${esc(fmtDate(t.work))}${t.workStart ? ' jam ' + esc(t.workStart) : ''}</div>` : ''}${acts(true)}</div>`;
   } else if (a.kind === 'idea' || a.kind === 'need') {
     h = `<div class="aiout"><div class="big">${a.kind === 'idea' ? 'Ide riset' : 'Kebutuhan riset'}: ${esc(a.item.title)}</div>${a.kind === 'need' ? `<div class="sub">Jenis: ${esc(cap(a.item.kind))}</div>` : ''}${acts(true)}</div>`;
+  } else if (a.kind === 'plan') {
+    const okc = a.items.filter(i => !i.err).length;
+    h = `<div class="aiout ${okc ? '' : 'warn'}">${a.items.map(i => i.err ? `<div class="pi bad"><div class="big">${esc(i.err)}</div></div>` : `<div class="pi"><div class="big">${esc(i.title)}</div>${i.lines.map(x => `<div class="sub">${esc(x)}</div>`).join('')}</div>`).join('')}<div class="acts">${okc ? btn(okc > 1 ? `Jalankan ${okc} aksi` : 'Simpan', 'ai-save', null, 'primary sm') : ''}${btn(okc ? 'Batal' : 'Tutup', 'ai-dismiss', null, 'sm')}</div></div>`;
   } else if (a.kind === 'answer') {
     h = `<div class="aiout"><div class="big">${esc(a.lines[0])}</div>${a.lines.slice(1).map(x => `<div class="sub">${esc(x)}</div>`).join('')}${acts(null)}</div>`;
   }
-  el.innerHTML = h;
+  el.innerHTML = `<div class="you">${esc(AIOUT.text || '')}</div>` + h;
+  el.scrollTop = el.scrollHeight;
 }
 async function runCommand(text) {
   text = text.trim(); if (!text) return;
@@ -1876,6 +1921,7 @@ async function runCommand(text) {
       catch (e) { err = e.message; act = null; }
     }
   }
+  if (act && act.kind === 'plan' && act.items.every(i => !i.err && i.name === 'nav.go')) { runPlan(act); AIOUT = null; renderAIOut(); render(); window.scrollTo(0, 0); return; }
   AIOUT = { text, act, via, err }; renderAIOut();
 }
 function clearAI() { AIOUT = null; renderAIOut(); }
@@ -1889,6 +1935,7 @@ ACT['ai-edit'] = () => {
 };
 ACT['ai-save'] = () => {
   const a = AIOUT?.act; if (!a) return;
+  if (a.kind === 'plan') { const r = runPlan(a); toast(r.errs.length ? 'Sebagian gagal: ' + r.errs[0] : r.n > 1 ? `${r.n} aksi dijalankan` : 'Tersimpan'); logAI('aksi'); clearAI(); render(); return; }
   if (a.kind === 'tx') {
     if (!txValid(a.tx)) { ACT['ai-edit'](); return; }
     saveTx(a.tx, a.fee); toast('Transaksi tersimpan');
@@ -1898,11 +1945,401 @@ ACT['ai-save'] = () => {
   logAI(a.kind); clearAI(); render();
 };
 
+/* ================= AGEN: semua aksi yang bisa dijalankan lewat chat ================= */
+const nrm = s => String(s || '').toLowerCase().replace(/[^a-z0-9% ]+/g, ' ').replace(/\s+/g, ' ').trim();
+function fuzzy(list, name, key) {
+  const n = nrm(name); if (!n) return null;
+  const val = x => nrm(typeof key === 'function' ? key(x) : x[key || 'title']);
+  return list.find(x => val(x) === n) || list.find(x => val(x).includes(n)) || list.find(x => val(x).length > 2 && n.includes(val(x))) || null;
+}
+function findAccAny(name) {
+  const n = nrm(name); if (!n) return null;
+  return S.accounts.find(a => nrm(a.name) === n) || S.accounts.find(a => String(a.alias || '').split(',').some(x => nrm(x) === n))
+    || S.accounts.find(a => nrm(a.name).includes(n) || n.includes(nrm(a.name))) || null;
+}
+const isoOrEmpty = s => { s = String(s || '').trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; return s ? (parseDate(s, 'future').date || '') : ''; };
+const hm24 = s => { const m = String(s || '').match(/(\d{1,2})(?:[.:](\d{2}))?/); return m && Number(m[1]) < 24 ? pad(Number(m[1])) + ':' + (m[2] || '00') : ''; };
+const dayIdx = v => { if (v === undefined || v === null || v === '') return -1; if (!isNaN(Number(v)) && Number(v) >= 0 && Number(v) <= 6 && String(v).length === 1) return Number(v); const k = String(v).toLowerCase().replace(/^hari\s+/, '').trim(); if (WD[k] !== undefined) return WD[k]; const i = DAYS.findIndex(d => d.toLowerCase().startsWith(k.slice(0, 3))); return i; };
+const fmtD = d => d ? fmtDate(d, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '';
+const freqL = { harian: 'tiap hari', mingguan: 'tiap minggu', bulanan: 'tiap bulan', tahunan: 'tiap tahun', tidak: '' };
+
+const AG = {};
+const okp = (title, lines, exec) => ({ title, lines: lines.filter(Boolean), exec });
+const bad = err => ({ err });
+
+/* --- akun --- */
+AG['account.add'] = a => {
+  const name = cap(a.name || ''); if (!name) return bad('Nama akun belum jelas.');
+  if (findAccAny(name) && nrm(findAccAny(name).name) === nrm(name)) return bad(`Akun ${name} sudah ada.`);
+  const pre = ACCOUNT_PRESETS.find(p => p[0].toLowerCase() === name.toLowerCase());
+  const type = ['bank', 'ewallet', 'tunai', 'investasi'].includes(a.type) ? a.type : (pre ? pre[1] : 'bank');
+  const open = Number(a.open) || 0; const nm = pre ? pre[0] : name;
+  return okp(`Akun baru: ${nm}`, [`${ACC_TYPE_L[type]}, saldo awal ${rp(open)}`], () => { S.accounts.push({ id: uid(), name: nm, type, open, alias: a.alias || '' }); commit('accounts'); });
+};
+AG['account.update'] = a => {
+  const acc = findAccAny(a.name); if (!acc) return bad(`Akun "${a.name}" belum ada.`);
+  const patch = {}, L = [];
+  if (a.open !== undefined && a.open !== '' && !isNaN(Number(a.open))) { patch.open = Number(a.open); L.push(`Saldo awal ${rp(acc.open)} jadi ${rp(patch.open)}`); L.push(`Saldo sekarang ikut berubah: ${rp(balances()[acc.id])} jadi ${rp(balances()[acc.id] - (Number(acc.open) || 0) + patch.open)}`); }
+  if (a.newName) { patch.name = cap(a.newName); L.push(`Nama baru: ${patch.name}`); }
+  if (a.alias) { patch.alias = a.alias; L.push(`Nama lain: ${a.alias}`); }
+  if (a.archived !== undefined) { patch.archived = !!a.archived; L.push(patch.archived ? 'Diarsipkan' : 'Diaktifkan lagi'); }
+  if (!L.length) return bad('Tidak ada yang diubah.');
+  return okp(`Ubah akun ${acc.name}`, L, () => { Object.assign(acc, patch); commit('accounts'); });
+};
+AG['account.reconcile'] = a => {
+  const acc = findAccAny(a.name); if (!acc) return bad(`Akun "${a.name}" belum ada.`);
+  const target = Number(a.balance); if (isNaN(target)) return bad('Nominal saldo belum jelas.');
+  const cur = balances()[acc.id]; const diff = target - cur;
+  if (Math.abs(diff) < 0.5) return bad(`Saldo ${acc.name} sudah ${rp(cur)}, tidak ada yang perlu diubah.`);
+  return okp(`Sesuaikan saldo ${acc.name}`, [`Catatan sekarang ${rp(cur)}, jadi ${rp(target)}`, `Dibuat transaksi penyesuaian ${diff > 0 ? 'pemasukan' : 'pengeluaran'} ${rp(Math.abs(diff))}`], () => saveTx({ type: diff > 0 ? 'in' : 'out', date: today(), amount: Math.abs(diff), acc: acc.id, cat: diff > 0 ? 'i_lain' : 'o_lain', sub: '', note: 'Penyesuaian saldo' }));
+};
+AG['account.remove'] = a => {
+  const acc = findAccAny(a.name); if (!acc) return bad(`Akun "${a.name}" belum ada.`);
+  const used = S.transactions.some(t => t.acc === acc.id || t.to === acc.id);
+  return okp(used ? `Arsipkan akun ${acc.name}` : `Hapus akun ${acc.name}`, [used ? 'Punya transaksi, jadi hanya diarsipkan supaya riwayat utuh.' : 'Belum ada transaksi, akun dihapus.'],
+    () => { if (used) { acc.archived = true; commit('accounts'); } else { S.accounts = S.accounts.filter(x => x.id !== acc.id); commit('accounts'); } });
+};
+
+/* --- transaksi dan tugas (dipakai Gemini untuk beberapa aksi sekaligus) --- */
+AG['tx.add'] = a => {
+  const type = ['in', 'out', 'tf'].includes(a.type) ? a.type : 'out'; const amount = Number(a.amount) || 0; if (!amount) return bad('Nominal belum jelas.');
+  const acc = findAccAny(a.acc) || accById(S.settings.lastAcc) || activeAccs()[0]; if (!acc) return bad('Belum ada akun. Tambahkan akun dulu.');
+  const tx = { type, date: isoOrEmpty(a.date) || today(), amount, acc: acc.id, note: String(a.note || '') };
+  const L = [];
+  if (type === 'tf') { const to = findAccAny(a.to); if (!to || to.id === acc.id) return bad('Akun tujuan transfer belum jelas.'); tx.to = to.id; L.push(`${acc.name} → ${to.name}`); }
+  else { const cat = byName(visCats(type), a.cat) || catLain(type); tx.cat = cat?.id || ''; tx.sub = ''; L.push(`${catName(tx.cat)} · ${acc.name}`); }
+  const fee = Number(a.fee) || 0; if (fee) L.push(`Biaya admin ${rp(fee)}`);
+  L.push(fmtD(tx.date) + (tx.note ? ' · ' + tx.note : ''));
+  return okp(`${{ out: 'Pengeluaran', in: 'Pemasukan', tf: 'Transfer' }[type]} ${rp(amount)}`, L, () => saveTx(tx, fee));
+};
+AG['tx.deleteLast'] = () => {
+  const last = [...S.transactions].sort((x, y) => (y.date || '').localeCompare(x.date || '') || (S.transactions.indexOf(y) - S.transactions.indexOf(x)))[0];
+  if (!last) return bad('Belum ada transaksi.');
+  const grp = last.group ? S.transactions.filter(t => t.group === last.group) : [last];
+  return okp(`Hapus transaksi terakhir`, [`${rp(last.amount)} · ${last.type === 'tf' ? 'transfer' : catName(last.cat)} · ${fmtD(last.date)}${last.note ? ' · ' + last.note : ''}`, grp.length > 1 ? 'Biaya admin yang terkait ikut dihapus.' : ''], () => { const ids = new Set(grp.map(t => t.id)); S.transactions = S.transactions.filter(t => !ids.has(t.id)); commit('transactions'); });
+};
+AG['task.add'] = a => {
+  const course = a.course ? (byName(S.courses, a.course) || fuzzy(S.courses, a.course, 'name')) : null;
+  const t = { title: cap(a.title || 'Tugas baru'), course: course?.id || '', due: isoOrEmpty(a.due), work: isoOrEmpty(a.work || a.workDate), workStart: hm24(a.workStart), kind: ['tugas', 'ujian', 'kuis', 'praktikum'].includes(a.kind) ? a.kind : 'tugas', prio: 'sedang' };
+  return okp(`${cap(t.kind)} baru: ${t.title}`, [`${course ? course.name : 'tanpa mata kuliah'} · ${t.due ? 'tenggat ' + fmtD(t.due) : 'tanpa tenggat'}`, t.work ? `Dikerjakan ${fmtD(t.work)}${t.workStart ? ' jam ' + t.workStart : ''}` : ''], () => { S.tasks.push({ id: uid(), done: false, parent: '', link: '', note: '', ...t }); commit('tasks'); });
+};
+const taskPick = name => fuzzy(S.tasks.filter(t => !t.parent), name, 'title');
+AG['task.done'] = a => { const t = taskPick(a.title); if (!t) return bad(`Tugas "${a.title}" tidak ditemukan.`); if (t.done) return bad(`${t.title} sudah selesai.`); return okp(`Tandai selesai: ${t.title}`, [t.due ? 'Tenggat ' + fmtD(t.due) : ''], () => { t.done = true; t.doneAt = today(); commit('tasks'); }); };
+AG['task.delete'] = a => { const t = taskPick(a.title); if (!t) return bad(`Tugas "${a.title}" tidak ditemukan.`); return okp(`Hapus tugas: ${t.title}`, ['Sub-tugasnya ikut terhapus.'], () => { const ids = new Set([t.id, ...S.tasks.filter(x => x.parent === t.id).map(x => x.id)]); S.tasks = S.tasks.filter(x => !ids.has(x.id)); commit('tasks'); }); };
+AG['task.update'] = a => {
+  const t = taskPick(a.title); if (!t) return bad(`Tugas "${a.title}" tidak ditemukan.`);
+  const p = {}, L = [];
+  if (a.due) { p.due = isoOrEmpty(a.due); L.push('Tenggat ' + fmtD(p.due)); }
+  if (a.work || a.workDate) { p.work = isoOrEmpty(a.work || a.workDate); L.push('Dikerjakan ' + fmtD(p.work)); }
+  if (a.workStart) { p.workStart = hm24(a.workStart); L.push('Mulai jam ' + p.workStart); }
+  if (a.newTitle) { p.title = cap(a.newTitle); L.push('Judul baru: ' + p.title); }
+  if (!L.length) return bad('Tidak ada yang diubah.');
+  return okp(`Ubah tugas: ${t.title}`, L, () => { Object.assign(t, p); commit('tasks'); });
+};
+
+/* --- kalender --- */
+AG['event.add'] = a => {
+  const title = cap(a.title || ''); if (!title) return bad('Nama acara belum jelas.');
+  const date = isoOrEmpty(a.date) || today();
+  const repeat = ['harian', 'mingguan', 'bulanan', 'tahunan'].includes(a.repeat) ? a.repeat : 'tidak';
+  const e = { title, date, endDate: isoOrEmpty(a.endDate), time: hm24(a.time), endTime: hm24(a.endTime), place: a.place || '', repeat, until: isoOrEmpty(a.until), note: a.note || '' };
+  return okp(`Acara baru: ${title}`, [fmtD(date) + (e.time ? ' · ' + e.time + (e.endTime ? ' sampai ' + e.endTime : '') : ' · seharian'), e.place ? 'Di ' + e.place : '', repeat !== 'tidak' ? 'Berulang ' + freqL[repeat] + (e.until ? ' sampai ' + fmtD(e.until) : '') : ''], () => { S.events.push({ id: uid(), ...e }); commit('events'); UI.calDate = date; });
+};
+AG['event.delete'] = a => { const e = fuzzy(S.events, a.title, 'title'); if (!e) return bad(`Acara "${a.title}" tidak ditemukan.`); return okp(`Hapus acara: ${e.title}`, [fmtD(e.date) + (e.repeat && e.repeat !== 'tidak' ? ' · berulang, semua kemunculannya hilang' : '')], () => { S.events = S.events.filter(x => x.id !== e.id); commit('events'); }); };
+AG['event.update'] = a => {
+  const e = fuzzy(S.events, a.title, 'title'); if (!e) return bad(`Acara "${a.title}" tidak ditemukan.`);
+  const p = {}, L = [];
+  if (a.date) { p.date = isoOrEmpty(a.date); L.push('Tanggal ' + fmtD(p.date)); }
+  if (a.time) { p.time = hm24(a.time); L.push('Mulai jam ' + p.time); }
+  if (a.endTime) { p.endTime = hm24(a.endTime); L.push('Selesai jam ' + p.endTime); }
+  if (a.place) { p.place = a.place; L.push('Tempat ' + a.place); }
+  if (a.newTitle) { p.title = cap(a.newTitle); L.push('Nama baru ' + p.title); }
+  if (!L.length) return bad('Tidak ada yang diubah.');
+  return okp(`Ubah acara: ${e.title}`, L, () => { Object.assign(e, p); commit('events'); });
+};
+AG['holiday.add'] = a => { const start = isoOrEmpty(a.start) || today(); const end = isoOrEmpty(a.end); const name = cap(a.name || 'Libur'); return okp(`Libur: ${name}`, [fmtD(start) + (end ? ' sampai ' + fmtD(end) : ''), 'Kelas kuliah dijeda di kalender selama libur.'], () => { S.holidays.push({ id: uid(), name, start, end }); commit('holidays'); }); };
+
+/* --- kuliah --- */
+AG['course.add'] = a => {
+  const name = cap(a.name || ''); if (!name) return bad('Nama mata kuliah belum jelas.');
+  if (S.courses.some(c => nrm(c.name) === nrm(name))) return bad(`Mata kuliah ${name} sudah ada.`);
+  const sem = Number(a.sem) || Number(S.settings.sem) || 1; const sks = Number(a.sks) || 2;
+  return okp(`Mata kuliah baru: ${name}`, [`Semester ${sem} · ${sks} SKS${a.lecturer ? ' · ' + a.lecturer : ''}`], () => { S.courses.push({ id: uid(), name, alias: a.alias || '', sem, sks, lecturer: a.lecturer || '', note: '' }); commit('courses'); });
+};
+AG['class.add'] = a => {
+  const co = byName(S.courses, a.course) || fuzzy(S.courses, a.course, 'name'); if (!co) return bad(`Mata kuliah "${a.course}" belum ada. Tambahkan dulu mata kuliahnya.`);
+  const day = dayIdx(a.day); if (day < 0) return bad('Hari kuliah belum jelas.');
+  const start = hm24(a.start) || '08:00'; const end = hm24(a.end) || addMinutes(start, 100);
+  return okp(`Jadwal kelas: ${co.name}`, [`${DAYS[day]}, ${start} sampai ${end}${a.room ? ' · ' + a.room : ''}`, 'Muncul otomatis di kalender tiap pekan.'], () => { S.schedule.push({ id: uid(), course: co.id, day, start, end, room: a.room || '' }); commit('schedule'); });
+};
+const addMinutes = (hm, n) => { const [h, m] = hm.split(':').map(Number); const t = Math.min(23 * 60 + 59, h * 60 + m + n); return pad(Math.floor(t / 60)) + ':' + pad(t % 60); };
+AG['semester.set'] = a => {
+  const sem = Number(a.sem); const st = isoOrEmpty(a.start), en = isoOrEmpty(a.end);
+  if (!sem && !st && !en) return bad('Semester belum jelas.');
+  return okp(`Atur semester${sem ? ' aktif ' + sem : ''}`, [st ? 'Mulai ' + fmtD(st) : '', en ? 'Selesai ' + fmtD(en) : ''], () => { if (sem) S.settings.sem = sem; if (st) S.settings.semStart = st; if (en) S.settings.semEnd = en; commit('settings'); });
+};
+AG['material.add'] = a => {
+  const title = cap(a.title || ''); if (!title) return bad('Judul materi belum jelas.');
+  const co = a.course ? (byName(S.courses, a.course) || fuzzy(S.courses, a.course, 'name')) : null;
+  return okp(`Materi baru: ${title}`, [co ? co.name : 'tanpa mata kuliah', a.url || ''], () => { S.materials.push({ id: uid(), title, course: co?.id || '', meeting: a.meeting || '', type: 'tautan', url: /^https?:\/\//i.test(a.url || '') ? a.url : '', tags: [], note: '' }); commit('materials'); });
+};
+
+/* --- riset --- */
+AG['idea.add'] = a => okp(`Ide riset: ${cap(a.title || '')}`, [], () => { S.ideas.push({ id: uid(), title: cap(a.title || ''), origin: '', status: 'mentah', note: '' }); commit('ideas'); });
+AG['need.add'] = a => okp(`Kebutuhan riset: ${cap(a.title || '')}`, [`Jenis ${a.kind || 'lainnya'}`], () => { S.needs.push({ id: uid(), title: cap(a.title || ''), kind: ['data', 'alat', 'izin', 'akses', 'literatur'].includes(a.kind) ? a.kind : 'lainnya', status: 'belum', note: '' }); commit('needs'); });
+AG['milestone.add'] = a => { const title = cap(a.title || ''); if (!title) return bad('Nama target belum jelas.'); const due = isoOrEmpty(a.due); return okp(`Target riset: ${title}`, [due ? 'Tenggat ' + fmtD(due) : 'tanpa tenggat'], () => { S.milestones.push({ id: uid(), title, due, pct: Number(a.pct) || 0, note: '' }); commit('milestones'); }); };
+AG['milestone.progress'] = a => { const m = fuzzy(S.milestones, a.title, 'title'); if (!m) return bad(`Target "${a.title}" tidak ditemukan.`); const pct = Math.max(0, Math.min(100, Number(a.pct))); if (isNaN(pct)) return bad('Persentase belum jelas.'); return okp(`Progres ${m.title}`, [`${m.pct || 0}% jadi ${pct}%`], () => { m.pct = pct; commit('milestones'); }); };
+AG['bimbingan.add'] = a => { const date = isoOrEmpty(a.date) || today(); return okp(`Bimbingan${a.with ? ' dengan ' + a.with : ''}`, [fmtD(date), a.points || '', a.nextDate ? 'Berikutnya ' + fmtD(isoOrEmpty(a.nextDate)) : ''], () => { S.bimbingan.push({ id: uid(), date, with: a.with || '', points: a.points || '', status: 'open', nextDate: isoOrEmpty(a.nextDate) }); commit('bimbingan'); }); };
+
+/* --- keuangan lain --- */
+AG['budget.set'] = a => {
+  const cat = byName(visCats('out'), a.cat) || matchCategory(String(a.cat || ''), 'out', true); if (!cat) return bad(`Kategori "${a.cat}" tidak dikenal.`);
+  const limit = Number(a.limit); if (!(limit > 0)) return bad('Batas anggaran belum jelas.');
+  const ex = S.budgets.find(b => b.cat === cat.id);
+  return okp(`Anggaran ${cat.name}`, [ex ? `${rp(ex.limit)} jadi ${rp(limit)} per bulan` : `${rp(limit)} per bulan`], () => { if (ex) ex.limit = limit; else S.budgets.push({ id: uid(), cat: cat.id, limit }); commit('budgets'); });
+};
+AG['goal.add'] = a => { const name = cap(a.name || ''); const target = Number(a.target); if (!name || !(target > 0)) return bad('Nama atau nominal target belum jelas.'); const dl = isoOrEmpty(a.deadline); return okp(`Target tabungan: ${name}`, [rp(target) + (dl ? ' sebelum ' + fmtD(dl) : '')], () => { S.goals.push({ id: uid(), name, target, saved: Number(a.saved) || 0, deadline: dl, note: '' }); commit('goals'); }); };
+AG['goal.save'] = a => { const g = fuzzy(S.goals, a.name, 'name'); if (!g) return bad(`Target tabungan "${a.name}" tidak ditemukan.`); const n = Number(a.amount); if (!(n > 0)) return bad('Nominal belum jelas.'); return okp(`Tabung untuk ${g.name}`, [`Terkumpul ${rp(g.saved)} jadi ${rp((Number(g.saved) || 0) + n)} dari ${rp(g.target)}`], () => { g.saved = (Number(g.saved) || 0) + n; commit('goals'); }); };
+AG['debt.add'] = a => { const person = cap(a.person || ''); const amount = Number(a.amount); if (!person || !(amount > 0)) return bad('Nama atau nominal belum jelas.'); const dir = a.dir === 'piutang' ? 'piutang' : 'utang'; const due = isoOrEmpty(a.due); return okp(`${dir === 'utang' ? 'Utang ke' : 'Piutang dari'} ${person}`, [rp(amount) + (due ? ' · jatuh tempo ' + fmtD(due) : '')], () => { S.debts.push({ id: uid(), dir, person, amount, paid: 0, date: today(), due, note: '' }); commit('debts'); }); };
+AG['debt.pay'] = a => { const d = fuzzy(S.debts.filter(x => (Number(x.paid) || 0) < Number(x.amount)), a.person, 'person'); if (!d) return bad(`Utang atau piutang "${a.person}" tidak ditemukan.`); const n = Math.min(Number(a.amount) || (d.amount - (d.paid || 0)), d.amount - (d.paid || 0)); return okp(`${d.dir === 'utang' ? 'Bayar utang ke' : 'Terima pembayaran dari'} ${d.person}`, [`Terbayar ${rp(d.paid || 0)} jadi ${rp((d.paid || 0) + n)} dari ${rp(d.amount)}`, 'Hanya mencatat pelunasan. Catat transaksi uangnya terpisah bila perlu.'], () => { d.paid = (Number(d.paid) || 0) + n; commit('debts'); }); };
+AG['bill.add'] = a => {
+  const name = cap(a.name || ''); const amount = Number(a.amount); if (!name || !(amount > 0)) return bad('Nama atau nominal tagihan belum jelas.');
+  const freq = ['bulanan', 'tahunan', 'sekali'].includes(a.freq) ? a.freq : 'bulanan'; const acc = findAccAny(a.acc) || accById(S.settings.lastAcc) || activeAccs()[0];
+  const cat = byName(visCats('out'), a.cat) || catById('o_langganan') || catLain('out'); const nextDue = isoOrEmpty(a.nextDue) || today();
+  return okp(`Tagihan: ${name}`, [`${rp(amount)} · ${freq} · berikutnya ${fmtD(nextDue)}`, acc ? 'Dibayar dari ' + acc.name : ''], () => { S.bills.push({ id: uid(), name, amount, freq, nextDue, cat: cat?.id || '', acc: acc?.id || '', note: '', active: true }); commit('bills'); });
+};
+AG['investment.add'] = a => {
+  const name = cap(a.name || ''); const cost = Number(a.cost); if (!name || !(cost >= 0)) return bad('Nama atau nominal investasi belum jelas.');
+  const kinds = ['reksa dana', 'saham', 'emas', 'obligasi atau SBN', 'kripto', 'deposito', 'lainnya']; const kind = kinds.includes(a.kind) ? a.kind : 'lainnya';
+  return okp(`Investasi: ${name}`, [`${cap(kind)}${a.platform ? ' di ' + a.platform : ''}`, `Modal ${rp(cost)}, nilai ${rp(Number(a.value) || cost)}`], () => { S.investments.push({ id: uid(), name, kind, platform: a.platform || '', cost, value: Number(a.value) || cost, note: '' }); commit('investments'); });
+};
+AG['investment.update'] = a => { const v = fuzzy(S.investments, a.name, 'name'); if (!v) return bad(`Investasi "${a.name}" tidak ditemukan.`); const val = Number(a.value); if (!(val >= 0)) return bad('Nilai belum jelas.'); return okp(`Nilai ${v.name}`, [`${rp(v.value)} jadi ${rp(val)}`], () => { v.value = val; commit('investments'); }); };
+AG['category.add'] = a => {
+  const name = cap(a.name || ''); if (!name) return bad('Nama kategori belum jelas.'); const kind = a.kind === 'in' ? 'in' : 'out';
+  if (S.categories.some(c => c.kind === kind && nrm(c.name) === nrm(name))) return bad(`Kategori ${name} sudah ada.`);
+  const kw = (Array.isArray(a.keywords) ? a.keywords : String(a.keywords || '').split(',')).map(s => s.trim().toLowerCase()).filter(Boolean);
+  return okp(`Kategori baru: ${name}`, [kind === 'in' ? 'Pemasukan' : 'Pengeluaran', kw.length ? 'Kata kunci: ' + kw.join(', ') : ''], () => { S.categories.push({ id: 'c_' + uid(), name, kind, icon: '📦', color: '#5b6a75', keywords: kw, subs: [], hidden: false, order: 99 }); commit('categories'); });
+};
+
+/* --- navigasi --- */
+AG['nav.go'] = a => { const t = String(a.tab || '').toLowerCase(); if (!TITLES[t]) return bad('Halaman tidak dikenal.'); return okp(`Buka ${TITLES[t]}`, [], () => { UI.tab = t; if (a.sub) { const ns = t === 'keuangan' ? 'keu' : t; if (UI.sub[ns] !== undefined) UI.sub[ns] = a.sub; } }); };
+
+/* daftar aksi untuk Gemini */
+const AG_DOC = `account.add {name,type:bank|ewallet|tunai|investasi,open:saldo awal,alias}
+account.update {name,open:saldo awal baru,newName,alias,archived}  (ubah SALDO AWAL, nama, atau arsip akun)
+account.reconcile {name,balance:saldo sekarang yang benar}  (menyamakan saldo catatan dengan saldo asli lewat transaksi penyesuaian)
+account.remove {name}
+tx.add {type:out|in|tf,amount,acc,to,cat,date,note,fee}
+tx.deleteLast {}
+task.add {title,course,due,work,workStart,kind:tugas|ujian|kuis|praktikum}
+task.done {title}
+task.delete {title}
+task.update {title,due,work,workStart,newTitle}
+event.add {title,date,time,endTime,endDate,place,repeat:tidak|harian|mingguan|bulanan|tahunan,until}
+event.update {title,date,time,endTime,place,newTitle}
+event.delete {title}
+holiday.add {name,start,end}
+course.add {name,sem,sks,lecturer,alias}
+class.add {course,day:Senin..Minggu,start,end,room}
+semester.set {sem,start,end}
+material.add {title,course,url,meeting}
+idea.add {title}
+need.add {title,kind:data|alat|izin|akses|literatur|lainnya}
+milestone.add {title,due,pct}
+milestone.progress {title,pct}
+bimbingan.add {date,with,points,nextDate}
+budget.set {cat,limit:batas bulanan}
+goal.add {name,target,deadline,saved}
+goal.save {name,amount}
+debt.add {dir:utang|piutang,person,amount,due}
+debt.pay {person,amount}
+bill.add {name,amount,freq:bulanan|tahunan|sekali,nextDue,cat,acc}
+investment.add {name,kind:reksa dana|saham|emas|obligasi atau SBN|kripto|deposito|lainnya,platform,cost,value}
+investment.update {name,value}
+category.add {name,kind:out|in,keywords}
+nav.go {tab:beranda|kalender|kuliah|riset|keuangan|pengaturan}`;
+
+function makePlan(list) {
+  const items = list.map(([name, args]) => { const f = AG[name]; if (!f) return { name, err: `Aksi "${name}" belum didukung.` }; let r; try { r = f(args || {}); } catch (e) { r = bad('Gagal menyiapkan: ' + e.message); } return { name, args, ...r }; });
+  return items.length ? { kind: 'plan', items } : null;
+}
+function runPlan(plan) {
+  let n = 0; const errs = [];
+  plan.items.forEach(it => { if (it.err || !it.exec) return; try { it.exec(); n++; } catch (e) { errs.push(e.message); } });
+  return { n, errs };
+}
+
+/* ---------- pengurai lokal untuk aksi ---------- */
+const WDRX = 'senin|selasa|rabu|kamis|jum\'?at|sabtu|minggu|ahad';
+function findCourse(text) {
+  let course = null, cl = 0, hit = '';
+  [...S.courses].sort((a, b) => (Number(b.sem) === Number(S.settings.sem)) - (Number(a.sem) === Number(S.settings.sem))).forEach(c => {
+    [c.name, ...String(c.alias || '').split(',')].map(s => s.trim()).filter(Boolean).forEach(n => { if (n.length > cl && new RegExp('(^|[^a-z0-9])' + reEsc(n) + '(?=$|[^a-z0-9])', 'i').test(text)) { course = c; cl = n.length; hit = n; } });
+  });
+  return { course, hit };
+}
+function pullTime(t) {
+  let start = '', end = '';
+  let m = t.match(/\b(?:jam|pukul|pkl)\s*(\d{1,2})(?:[.:](\d{2}))?(?:\s*(?:-|sampai|s\/d|hingga)\s*(?:jam\s*)?(\d{1,2})(?:[.:](\d{2}))?)?/i);
+  if (!m) m = t.match(/\b(\d{1,2})[.:](\d{2})(?:\s*(?:-|sampai|s\/d|hingga)\s*(\d{1,2})[.:](\d{2}))?\b/);
+  if (m) { start = pad(Number(m[1])) + ':' + (m[2] || '00'); if (m[3]) end = pad(Number(m[3])) + ':' + (m[4] || '00'); t = t.replace(m[0], ' '); if (Number(m[1]) > 23) { start = ''; end = ''; } }
+  return { start, end, rest: t };
+}
+function pullRepeat(t) {
+  let repeat = 'tidak', wd = -1;
+  let m = t.match(new RegExp('\\b(?:tiap|setiap|per)\\s+(?:hari\\s+)?(' + WDRX + ')\\b', 'i'));
+  if (m) { repeat = 'mingguan'; wd = WD[m[1].toLowerCase()]; t = t.replace(m[0], ' '); }
+  else if ((m = t.match(/\b(?:tiap|setiap|per)\s*(hari|minggu|pekan|bulan|tahun)\b/i))) { repeat = { hari: 'harian', minggu: 'mingguan', pekan: 'mingguan', bulan: 'bulanan', tahun: 'tahunan' }[m[1].toLowerCase()]; t = t.replace(m[0], ' '); }
+  else if ((m = t.match(/\b(harian|mingguan|bulanan|tahunan)\b/i))) { repeat = m[1].toLowerCase(); t = t.replace(m[0], ' '); }
+  return { repeat, wd, rest: t };
+}
+const tidy = s => s.replace(/\s+/g, ' ').replace(/^[\s,.:;-]+|[\s,.:;-]+$/g, '').trim();
+const stripLead = (t, re) => t.replace(re, '').trim();
+
+function localAgent(raw) {
+  const t0 = raw.trim(); if (!t0) return null; const low = t0.toLowerCase(); let m;
+  const P = (name, args) => makePlan([[name, args]]);
+  /* navigasi */
+  if ((m = low.match(/^(?:buka|ke|lihat|tampilkan|pindah ke)\s+(?:halaman\s+|tab\s+)?(beranda|kalender|kuliah|riset|keuangan|pengaturan)\b(?:\s+(.+))?$/))) {
+    const subMap = { akun: 'akun', transaksi: 'transaksi', investasi: 'investasi', anggaran: 'anggaran', target: 'target', utang: 'utang', tagihan: 'tagihan', kategori: 'kategori', tugas: 'tugas', materi: 'materi', jadwal: 'jadwal', ide: 'ide', literatur: 'literatur', bimbingan: 'bimbingan', kebutuhan: 'kebutuhan', progres: 'progres' };
+    return P('nav.go', { tab: m[1], sub: subMap[(m[2] || '').trim()] || '' });
+  }
+  /* pertanyaan tidak diubah jadi aksi */
+  if (/\?\s*$/.test(t0) || /\b(berapa|apa saja|apakah|bagaimana|kapan)\b/.test(low) || /^(cek|lihat|tampilkan|tunjukkan|daftar)\b/.test(low)) {
+    return /^(acara|agenda|jadwal)\b/.test(low.replace(/^(cek|lihat|tampilkan|tunjukkan|daftar)\s+/, '')) ? agendaAnswer(low) : null;
+  }
+  const am = findAmount(t0);
+
+  /* agenda: "agenda besok", "jadwal minggu ini" */
+  if (/^(acara|agenda|jadwal|kalender)\s+(hari ini|besok|lusa|minggu ini|minggu depan|kemarin)\s*$/.test(low)) return agendaAnswer(low);
+
+  /* akun dan saldo */
+  const hasSaldo = /\bsaldo\b/.test(low), akunCmd = /^(?:tambah(?:kan)?\s+|buat\s+|bikin\s+|buatkan\s+)?(akun|rekening|dompet)\b/.test(low);
+  if (akunCmd || (hasSaldo && am.amount && !/\b(tarik|setor|top\s*up|topup|transfer|gaji|bayar|beli)\b/.test(low))) {
+    const awal = /\bawal(?:nya)?\b/.test(low); const hits = findAccounts(t0); let acc = hits[0]?.acc || null;
+    if (acc) {
+      if (!am.amount) return null;
+      return (awal || akunCmd) ? P('account.update', { name: acc.name, open: am.amount }) : P('account.reconcile', { name: acc.name, balance: am.amount });
+    }
+    const nm = tidy(am.rest.replace(/\b(tambah\w*|buat\w*|bikin|akun|rekening|dompet|baru|saldo|awal\w*|sekarang|sisa|jadi|menjadi|set|atur|ubah|ganti|di|nya|sebesar|sebanyak|senilai|rp|dengan|isi)\b/gi, ' '));
+    if (nm && (akunCmd || awal)) return P('account.add', { name: nm, open: am.amount });
+    if (nm && hasSaldo && am.amount) { const ex = findAccAny(nm); if (ex) return P('account.reconcile', { name: ex.name, balance: am.amount }); }
+    if (akunCmd && nm) return P('account.add', { name: nm, open: 0 });
+  }
+  if ((m = low.match(/^hapus\s+(?:akun|rekening|dompet)\s+(.+)/))) return P('account.remove', { name: m[1] });
+  if (/^hapus\s+transaksi\s+(terakhir|barusan|tadi)/.test(low)) return P('tx.deleteLast', {});
+
+  /* hapus tugas atau acara */
+  if ((m = t0.match(/^hapus\s+tugas\s+(.+)/i))) return P('task.delete', { title: m[1] });
+  if ((m = t0.match(/^hapus\s+(?:acara|agenda)\s+(.+)/i))) return P('event.delete', { title: m[1] });
+
+  /* selesai tugas */
+  if ((m = t0.match(/^(?:selesai(?:kan)?|sudah selesai|centang|tandai selesai|beres(?:kan)?|kelar)\s+(?:tugas\s+)?(.+)/i)) && taskPick(m[1])) return P('task.done', { title: m[1] });
+  if ((m = t0.match(/^(?:tugas\s+)?(.+?)\s+(?:sudah\s+)?(?:selesai|beres|kelar|dikumpul)\s*$/i)) && taskPick(m[1])) return P('task.done', { title: m[1] });
+
+  /* semester aktif */
+  if ((m = low.match(/^(?:semester\s+aktif|pindah\s+semester|ganti\s+semester|aktifkan\s+semester|semester)\s*(?:jadi|ke)?\s*(\d{1,2})\b(.*)$/))) {
+    const rest = m[2] || ''; const sm = rest.match(/mulai\s+(.+?)(?:\s+(?:sampai|s\/d|hingga)\s+(.+))?$/);
+    return P('semester.set', { sem: Number(m[1]), start: sm ? parseDate(sm[1], 'future').date || '' : '', end: sm && sm[2] ? parseDate(sm[2], 'future').date || '' : '' });
+  }
+
+  /* mata kuliah */
+  if ((m = t0.match(/^(?:tambah(?:kan)?\s+)?(?:mata\s*kuliah|matkul|mk)\s+(.+)/i))) {
+    let r = m[1]; const o = {};
+    let x; if ((x = r.match(/\b(\d)\s*sks\b|\bsks\s*(\d)\b/i))) { o.sks = Number(x[1] || x[2]); r = r.replace(x[0], ' '); }
+    if ((x = r.match(/\bsem(?:ester)?\s*(\d{1,2})\b/i))) { o.sem = Number(x[1]); r = r.replace(x[0], ' '); }
+    if ((x = r.match(/\b(?:dosen(?:nya)?|pengampu)\s+(.+)$/i))) { o.lecturer = tidy(x[1]); r = r.replace(x[0], ' '); }
+    return P('course.add', { name: tidy(r), ...o });
+  }
+  /* jadwal kelas */
+  if ((m = t0.match(/^(?:tambah(?:kan)?\s+)?jadwal\s+(?:kuliah\s+|kelas\s+)?(.+)/i)) && new RegExp('\\b(' + WDRX + ')\\b', 'i').test(m[1])) {
+    let r = m[1]; const wd = r.match(new RegExp('\\b(' + WDRX + ')\\b', 'i')); r = r.replace(wd[0], ' ');
+    const tm = pullTime(r); r = tm.rest; let room = ''; const rm = r.match(/\b(?:ruang(?:an)?|di)\s+([\w.\-]+(?:\s+[\w.\-]+)?)\s*$/i); if (rm) { room = rm[1]; r = r.replace(rm[0], ' '); }
+    const fc = findCourse(r); const nm = fc.course ? fc.course.name : tidy(r);
+    return P('class.add', { course: nm, day: WD[wd[1].toLowerCase()], start: tm.start, end: tm.end, room });
+  }
+
+  /* libur */
+  if ((m = t0.match(/^libur\s+(.+)/i))) {
+    let r = m[1]; let end = ''; const e = r.match(/\b(?:sampai|s\/d|hingga)\s+(.+)$/i); if (e) { end = parseDate(e[1], 'future').date || ''; r = r.replace(e[0], ' '); }
+    const d = parseDate(r, 'future'); return P('holiday.add', { name: tidy(d.rest) || 'Libur', start: d.date || today(), end });
+  }
+
+  /* materi */
+  if ((m = t0.match(/^(?:simpan\s+)?(?:materi|slide)\s+(.+)/i))) {
+    let r = m[1]; let url = ''; const u = r.match(/https?:\/\/\S+/); if (u) { url = u[0]; r = r.replace(u[0], ' '); }
+    let meeting = ''; const pm = r.match(/\bpertemuan\s*(\d+)/i); if (pm) { meeting = pm[1]; r = r.replace(pm[0], ' '); }
+    const fc = findCourse(r); if (fc.course) r = r.replace(new RegExp(reEsc(fc.hit), 'i'), ' ');
+    return P('material.add', { title: tidy(r), course: fc.course?.name || '', url, meeting });
+  }
+
+  /* progres riset */
+  if ((m = t0.match(/^(?:progres|progress|update|perbarui)\s+(.+?)\s*(?:jadi|menjadi|ke|sudah|:|=)?\s*(\d{1,3})\s*%/i)) && S.milestones.length) return P('milestone.progress', { title: m[1], pct: Number(m[2]) });
+  if ((m = t0.match(/^(?:target\s+riset|milestone|tahap\s+riset)\s*[:\-]?\s*(.+)/i))) { const d = parseDate(m[1], 'future'); return P('milestone.add', { title: tidy(d.rest.replace(/\b(deadline|tenggat|sebelum)\b/gi, ' ')), due: d.date || '' }); }
+  if (/^bimbingan\b/i.test(t0)) {
+    let r = t0.replace(/^bimbingan\s*/i, ''); const next = /\b(berikutnya|selanjutnya|lagi)\b/i.test(r); r = r.replace(/\b(berikutnya|selanjutnya|lagi)\b/gi, ' ');
+    let who = ''; const w = r.match(/\b(?:dengan|bareng|sama|ke)\s+((?:pak|bu|prof|dr|dosen)?\.?\s*[a-z.]+(?:\s+[a-z.]+)?)/i);
+    const d = parseDate(r, next ? 'future' : 'past'); if (w) who = cap(w[1]).replace(/\s+(besok|lusa|hari|tanggal|jam)\b.*$/i, '');
+    return P('bimbingan.add', next ? { date: today(), with: who, nextDate: d.date || '' } : { date: d.date || today(), with: who, points: '' });
+  }
+
+  /* anggaran, target tabungan, tagihan, utang, investasi */
+  if ((m = t0.match(/^(?:anggaran|budget|batas)\s+(?:belanja\s+)?(.+)/i)) && am.amount) { const r = am.rest.replace(/^(?:anggaran|budget|batas)\s+(?:belanja\s+)?/i, '').replace(/\b(per\s*bulan|sebulan|tiap bulan|maksimal|maks)\b/gi, ' '); return P('budget.set', { cat: tidy(r), limit: am.amount }); }
+  if (/^(?:tabung|nabung|menabung)\b/i.test(t0) && am.amount) { const g = fuzzy(S.goals, am.rest.replace(/^(?:tabung|nabung|menabung)\s*/i, '').replace(/\b(ke|untuk|di|target)\b/gi, ' '), 'name'); if (g) return P('goal.save', { name: g.name, amount: am.amount }); }
+  if ((m = t0.match(/^(?:target\s+tabungan|tabungan\s+untuk|nabung\s+untuk|menabung\s+untuk|goal)\s+(.+)/i)) && am.amount) { const d = parseDate(am.rest.replace(/^(?:target\s+tabungan|tabungan\s+untuk|nabung\s+untuk|menabung\s+untuk|goal)\s+/i, ''), 'future'); return P('goal.add', { name: tidy(d.rest.replace(/\b(sebelum|target|deadline)\b/gi, ' ')), target: am.amount, deadline: d.date || '' }); }
+  if ((m = t0.match(/^(?:bayar|cicil|lunasi)\s+(?:utang|hutang)\s+(?:ke\s+)?(.+)/i)) && S.debts.some(x => x.dir === 'utang')) { const r = am.amount ? am.rest.replace(/^(?:bayar|cicil|lunasi)\s+(?:utang|hutang)\s+(?:ke\s+)?/i, '') : m[1]; if (fuzzy(S.debts, r, 'person')) return P('debt.pay', { person: tidy(r), amount: am.amount }); }
+  if ((m = t0.match(/^(?:utang|hutang)\s+(?:ke\s+)?(.+)/i)) && am.amount) { const d = parseDate(am.rest.replace(/^(?:utang|hutang)\s+(?:ke\s+)?/i, ''), 'future'); return P('debt.add', { dir: 'utang', person: tidy(d.rest.replace(/\b(jatuh tempo|sebesar|rp|uang)\b/gi, ' ')), amount: am.amount, due: d.date || '' }); }
+  if ((m = t0.match(/^(?:piutang|pinjamkan(?:\s+uang)?)\s+(?:dari\s+|ke\s+)?(.+)/i)) && am.amount) { const d = parseDate(am.rest.replace(/^(?:piutang|pinjamkan(?:\s+uang)?)\s+(?:dari\s+|ke\s+)?/i, ''), 'future'); return P('debt.add', { dir: 'piutang', person: tidy(d.rest.replace(/\b(jatuh tempo|sebesar|rp|uang)\b/gi, ' ')), amount: am.amount, due: d.date || '' }); }
+  if ((m = t0.match(/^(.+?)\s+pinjam\s+(?:uang\s+)?/i)) && am.amount && !/\b(aku|saya)\b/i.test(m[1])) return P('debt.add', { dir: 'piutang', person: tidy(m[1]), amount: am.amount });
+  if ((m = t0.match(/^(?:tagihan|langganan|cicilan|bayaran rutin)\s+(.+)/i)) && am.amount) {
+    let r = am.rest.replace(/^(?:tagihan|langganan|cicilan|bayaran rutin)\s+/i, ''); const fr = pullRepeat(r.replace(/\btiap\s+bulan\b/i, 'bulanan')); r = fr.rest;
+    const freq = fr.repeat === 'tahunan' ? 'tahunan' : /\bsekali\b/i.test(t0) ? 'sekali' : 'bulanan'; r = r.replace(/\bsekali( saja)?\b/i, ' ');
+    const d = parseDate(r, 'future'); const hits = findAccounts(d.rest); const cat = matchCategory(d.rest, 'out', true);
+    return P('bill.add', { name: tidy(cleanNote(d.rest, hits).replace(/\b(bulanan|tahunan|tiap)\b/gi, ' ')), amount: am.amount, freq, nextDue: d.date || '', cat: cat?.name || '', acc: hits[0]?.acc.name || '' });
+  }
+  if ((m = low.match(/^(?:nilai|update|ubah|perbarui)\s+investasi\s+(.+)/)) && am.amount) { const r = am.rest.replace(/^(?:nilai|update|ubah|perbarui)\s+investasi\s+/i, '').replace(/\b(jadi|menjadi|sekarang|senilai|rp)\b/gi, ' '); if (fuzzy(S.investments, r, 'name')) return P('investment.update', { name: tidy(r), value: am.amount }); }
+  if ((m = low.match(/^(?:investasi|invest|beli\s+(?:saham|reksa\s*dana|emas|obligasi|sbn|kripto|crypto|deposito))\b/)) && am.amount) {
+    const kinds = [['saham', 'saham'], ['reksa', 'reksa dana'], ['emas', 'emas'], ['obligasi', 'obligasi atau SBN'], ['sbn', 'obligasi atau SBN'], ['kripto', 'kripto'], ['crypto', 'kripto'], ['deposito', 'deposito']];
+    const kind = (kinds.find(k => low.includes(k[0])) || [0, 'lainnya'])[1]; let r = am.rest.replace(/^(?:investasi|invest|beli)\s*/i, ''); let platform = ''; const pm = r.match(/\b(?:di|lewat|via)\s+([a-z0-9 ]+)$/i); if (pm) { platform = tidy(pm[1]); r = r.replace(pm[0], ' '); }
+    return P('investment.add', { name: tidy(r) || cap(kind), kind, platform, cost: am.amount, value: am.amount });
+  }
+  if ((m = t0.match(/^(?:tambah(?:kan)?\s+)?kategori\s+(pengeluaran|pemasukan)?\s*(.+)/i))) { let r = m[2]; let kw = ''; const k = r.match(/\b(?:kata\s*kunci|kunci)\s*[:]?\s*(.+)$/i); if (k) { kw = k[1]; r = r.replace(k[0], ' '); } return P('category.add', { name: tidy(r), kind: /pemasukan/i.test(m[1] || '') ? 'in' : 'out', keywords: kw }); }
+
+  /* acara kalender */
+  const evKey = /^(?:tambah(?:kan)?\s+)?(?:acara|agenda|rapat|meeting|janji(?:\s+temu)?|kegiatan|event|rencana|jadwalkan|ingatkan(?:\s+(?:aku|saya))?(?:\s+untuk)?|catat\s+acara)\b[:\s]*/i;
+  const evM = t0.match(evKey);
+  const timeish = /\b(?:jam|pukul|pkl)\s*\d/i.test(t0) || /\b\d{1,2}[.:]\d{2}\b/.test(t0);
+  if (evM || (timeish && !am.amount && !/^(tugas|ujian|uts|uas|kuis|quiz|praktikum|ide|butuh)/i.test(t0))) {
+    let r = evM ? t0.slice(evM[0].length) : t0; const leadWord = evM ? evM[0].trim().toLowerCase() : '';
+    const rp_ = pullRepeat(r); r = rp_.rest;
+    let until = ''; const um = r.match(/\bsampai\s+(?:tanggal\s+)?(.+?)\s*$/i);
+    const tm = pullTime(r); r = tm.rest;
+    let endDate = ''; const em = r.match(/\b(?:sampai|s\/d|hingga)\s+(.+)$/i);
+    if (em) { const ed = parseDate(em[1], 'future'); if (ed.date) { if (rp_.repeat !== 'tidak') until = ed.date; else endDate = ed.date; r = r.replace(em[0], ' '); } }
+    const d = parseDate(r, 'future'); r = d.rest; let date = d.date || '';
+    if (!date && rp_.wd >= 0) { const cur = weekdayIdx(today()); let df = rp_.wd - cur; if (df < 0) df += 7; date = addDays(today(), df); }
+    if (!date) date = UI.calDate && UI.tab === 'kalender' ? UI.calDate : today();
+    let place = ''; const pm = r.match(/\b(?:di|lokasi|tempat|ruang)\s+(.+)$/i); if (pm) { place = tidy(pm[1]); r = r.replace(pm[0], ' '); }
+    let title = tidy(r.replace(/\b(pada|tanggal|hari|dan|nanti)\b/gi, ' ')); if (!evM || ['rapat', 'meeting', 'janji', 'janji temu'].includes(leadWord)) title = tidy((['rapat', 'meeting'].includes(leadWord) ? cap(leadWord) + ' ' : leadWord.startsWith('janji') ? 'Janji ' : '') + title);
+    return P('event.add', { title: title || 'Acara', date, time: tm.start, endTime: tm.end, endDate, place, repeat: rp_.repeat, until });
+  }
+  return null;
+}
+function agendaAnswer(low) {
+  const T = today(); let a = T, b = T, label = 'hari ini';
+  if (/besok/.test(low)) { a = b = addDays(T, 1); label = 'besok'; } else if (/lusa/.test(low)) { a = b = addDays(T, 2); label = 'lusa'; } else if (/kemarin/.test(low)) { a = b = addDays(T, -1); label = 'kemarin'; }
+  else if (/minggu depan/.test(low)) { a = addDays(startOfWeek(T), 7); b = addDays(a, 6); label = 'minggu depan'; } else if (/minggu ini/.test(low)) { a = startOfWeek(T); b = addDays(a, 6); label = 'minggu ini'; }
+  const lines = [];
+  for (let d = a; d <= b; d = addDays(d, 1)) eventsOn(d, false).forEach(e => lines.push(`${a === b ? '' : fmtDate(d, { weekday: 'short', day: 'numeric', month: 'short' }) + ': '}${e.time ? e.time + ' ' : ''}${e.title} (${TYPES[e.type][0]})`));
+  return { kind: 'answer', lines: lines.length ? [`Agenda ${label}: ${lines.length}`, ...lines.slice(0, 14)] : [`Tidak ada agenda ${label}.`] };
+}
+
 /* ================= VIEW: Pengaturan ================= */
-const EXAMPLES = ['kopi 15rb dana', 'tarik tunai 200rb dari bri admin 2500', 'topup dana 100rb dari bca', 'gaji magang 1,5jt masuk bca', 'kemarin bensin 25rb tunai', 'tugas laporan deadline Jumat kerjakan Rabu jam 19', 'uas 2 desember', 'ide: bandingkan dua skala analisis', 'butuh izin masuk kawasan', 'berapa pengeluaran makan bulan ini', 'saldo', 'tugas minggu ini'];
+const PH = ['Coba: akun bca saldo awalnya 1 juta', 'Coba: rapat kelompok besok jam 14 di perpus', 'Coba: kopi 15rb dana', 'Coba: jadwal metpen senin 08.00-09.40', 'Coba: selesai tugas laporan', 'Coba: anggaran makan 800rb', 'Coba: agenda minggu ini'];
+const EXAMPLES = ['akun bca saldo awalnya 1 juta', 'rapat kelompok besok jam 14 di perpus', 'acara les tiap senin jam 19', 'mata kuliah Statistika 3 sks semester 3', 'jadwal statistika selasa 10.00-11.40 ruang B2', 'selesai tugas laporan', 'anggaran makan 800rb', 'target tabungan laptop 8jt sebelum 20 desember', 'utang ke Budi 50rb', 'tagihan netflix 54rb tiap bulan tanggal 5', 'progres bab 3 jadi 60%', 'agenda minggu ini', 'buka kalender', 'kopi 15rb dana', 'tarik tunai 200rb dari bri admin 2500', 'topup dana 100rb dari bca', 'gaji magang 1,5jt masuk bca', 'kemarin bensin 25rb tunai', 'tugas laporan deadline Jumat kerjakan Rabu jam 19', 'uas 2 desember', 'ide: bandingkan dua skala analisis', 'butuh izin masuk kawasan', 'berapa pengeluaran makan bulan ini', 'saldo', 'tugas minggu ini'];
 function setAsisten() {
   const st = S.settings; const proxy = st.geminiMode === 'proxy';
-  return `<div class="stack">${panel('Cara memakai', `<p class="small mute" style="margin-bottom:8px">Ketik di kolom paling atas halaman mana pun. Hasilnya muncul sebagai pratinjau, dan baru tersimpan setelah kamu menekan Simpan. Ketuk contoh di bawah untuk mencobanya.</p><div class="cmdhint">${EXAMPLES.map(x => `<button type="button" ${A('ai-example', x)}>${esc(x)}</button>`).join('')}</div>
+  return `<div class="stack">${panel('Cara memakai', `<p class="small mute" style="margin-bottom:8px">Ketik di kolom obrolan di bagian bawah halaman mana pun. Asisten bisa mencatat transaksi, mengatur akun dan saldo awal, menambah acara kalender, mata kuliah, jadwal kelas, tugas, target riset, anggaran, utang, tagihan, investasi dan target tabungan. Setiap perubahan tampil sebagai pratinjau dulu dan baru tersimpan setelah kamu menekan Simpan. Ketuk contoh di bawah untuk mencobanya.</p><div class="cmdhint">${EXAMPLES.map(x => `<button type="button" ${A('ai-example', x)}>${esc(x)}</button>`).join('')}</div>
     <p class="small mute" style="margin-top:10px">Perintah biasa diproses langsung di perangkatmu tanpa internet dan tanpa AI. Kata kunci per kategori diatur di Keuangan, tab Kategori. Nama lain akun (misalnya gopay) diatur di form akun.</p>`)}
     ${panel('Sambungkan Gemini (opsional)', `<div class="stack"><p class="small mute">Gemini dipakai untuk kalimat bebas yang tidak dikenali pengurai biasa. Kalau kamu mengizinkan, Gemini juga bisa menjawab pertanyaan tentang datamu.</p>
       <ol class="steps small">
@@ -2020,12 +2457,13 @@ const TITLES = { beranda: 'Beranda', kalender: 'Kalender', kuliah: 'Kuliah', ris
 const VIEWS = { beranda: viewBeranda, kalender: viewKalender, kuliah: viewKuliah, riset: viewRiset, keuangan: viewKeuangan, pengaturan: viewPengaturan };
 function renderNav() {
   const items = Object.entries(TITLES);
-  $('#nav').innerHTML = `<div class="brand">Hub Pribadi</div>` + items.map(([k, l]) => `<button type="button" class="${UI.tab === k ? 'on' : ''}" ${UI.tab === k ? 'aria-current="page"' : ''} ${A('go', k)}>${l}</button>`).join('');
+  $('#nav').innerHTML = `<div class="brand">Hub<br>Pribadi<small>kuliah · riset · uang</small></div>` + items.map(([k, l]) => `<button type="button" class="${UI.tab === k ? 'on' : ''}" ${UI.tab === k ? 'aria-current="page"' : ''} ${A('go', k)}>${l}</button>`).join('');
   $('#tabbar').innerHTML = items.slice(0, 5).map(([k, l]) => `<button type="button" class="${UI.tab === k ? 'on' : ''}" ${UI.tab === k ? 'aria-current="page"' : ''} ${A('go', k)}>${l}</button>`).join('');
 }
 function render() {
   const ae = document.activeElement; const key = ae && ae.dataset ? ae.dataset.search : null; const pos = ae && ae.selectionStart;
   $('#title').textContent = TITLES[UI.tab];
+  $('#kicker').textContent = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
   document.title = TITLES[UI.tab] + ' · Hub Pribadi';
   $('#main').innerHTML = VIEWS[UI.tab]();
   renderNav(); renderSyncBadge();
@@ -2036,7 +2474,7 @@ function render() {
 function addCurrent() {
   const s = UI.sub;
   const m = {
-    beranda: editTx, kalender: () => editTask(null),
+    beranda: editTx, kalender: () => editEvent(null),
     kuliah: () => ({ tugas: () => editTask(null), materi: () => editMaterial(null), matkul: () => editCourse(null), jadwal: () => editClass(null), statistik: () => editTask(null) }[s.kuliah])(),
     riset: () => ({ progres: () => editMilestone(null), kebutuhan: () => editNeed(null), ide: () => editIdea(null), literatur: () => editLit(null), bimbingan: () => editBim(null) }[s.riset])(),
     keuangan: () => ({ ringkasan: () => editTx(null), transaksi: () => editTx(null), akun: () => editAccount(null), investasi: () => editInv(null), anggaran: () => editBudget(null), target: () => editGoal(null), utang: () => editDebt(null), tagihan: () => editBill(null), kategori: () => editCat(null) }[s.keu])()
@@ -2095,6 +2533,7 @@ async function init() {
     if (code.length >= 16 && confirm('Sambungkan perangkat ini ke sinkron memakai kode dari tautan?')) { S.settings.syncSecret = code; S.settings.syncOn = true; S.settings.syncRev = 0; commit('settings'); }
   }
   wire(); render(); renderAIOut(); startSyncLoop();
+  { let pi = 0; setInterval(() => { const i = $('#cmdin'); if (i && document.activeElement !== i) i.placeholder = PH[++pi % PH.length]; }, 4500); }
   if (syncActive()) syncNow({ full: true });
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => { });
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => { });
