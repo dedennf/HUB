@@ -143,3 +143,22 @@ Mode `direct` menyimpan `GEMINI_API_KEY` di IndexedDB dan bertentangan dengan SP
 **Status: Diputuskan**
 
 SPEC menyebut `public/manifest.json`. Nama file bebas, isi dipertahankan dari `manifest.webmanifest` lama (nama "Hub Pribadi", ikon 192/512/maskable). Warna tema diseragamkan karena manifest dan `index.html` lama berbeda. Cache service worker lama (`hub-pribadi-v4`) dibersihkan oleh service worker baru agar perangkat tidak terus menampilkan versi lama.
+
+---
+
+## D-14 · Pembulatan nominal saat migrasi
+**Status: Diputuskan**
+
+Semua nominal dibulatkan ke rupiah terdekat (`Math.round`). Selisih pembulatan dicatat di laporan impor per record. Untuk cadangan 2026-11-21, ini hanya menyentuh satu saldo awal dengan selisih di bawah Rp1.
+
+## D-15 · Data mencurigakan tidak diperbaiki diam-diam
+**Status: Diputuskan**
+
+Importer tidak mengubah isi data selain format. Record yang janggal (misalnya tanggal transaksi jauh sebelum app dibuat) ditampilkan di layar pratinjau impor dengan penanda kuning, dan pengguna memilih sendiri untuk memperbaikinya atau tidak. Transaksi bertanggal 2024-11-15 di cadangan 2026-11-21 masuk kategori ini.
+
+## D-16 · Koleksi tak dikenal di cadangan
+**Status: Perlu masukan pemilik**
+
+Cadangan memuat koleksi `recurring` dan `focus` yang tidak ada di kode git (AUDIT 10.1). Keduanya kosong, jadi tidak ada data yang hilang. Importer akan menolak dengan peringatan jika suatu saat koleksi tak dikenal berisi data, bukan membuangnya diam-diam.
+
+Kode versi terbaru itu sebaiknya diambil supaya fitur yang sudah dipakai (kemungkinan struk, transaksi berulang, dan mode fokus) masuk daftar regresi. Sumber yang mungkin: folder lokal di laptop pemilik, atau tab Source pada deployment terakhir di dashboard Vercel.

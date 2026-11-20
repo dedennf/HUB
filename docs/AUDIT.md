@@ -269,3 +269,28 @@ Daftar ini menjadi kriteria regresi untuk setiap fase berikutnya.
 | 12 | Kunci hanya di server | Ada mode kunci di browser | Hapus mode `direct` saat Fase 3 |
 | 14 Fase 1 | "Data lama termigrasi" | Data tersebar di beberapa perangkat | Tambah kriteria: sinkron terakhir di app lama dulu, lalu ekspor dari perangkat terlengkap |
 | 15 | "Fitur lama tetap berjalan" | Banyak fitur lama tidak disebut di SPEC | Rujuk daftar Bagian 7 dokumen ini |
+
+---
+
+## 10. Analisis File Cadangan dari Pemilik (2026-11-21)
+
+Pemilik mengunggah cadangan `hub-pribadi-2026-11-21.json` (format `app: hub-pribadi`, `version: 1`, diekspor 2026-11-21 03.29 WIB). File ini **tidak di-commit** ke repo karena berisi data keuangan dan nama orang. Ringkasan isinya:
+
+| Koleksi | Jumlah | Koleksi | Jumlah |
+|---|---|---|---|
+| courses | 5 | accounts | 5 |
+| schedule | 5 | categories | 21 (semua bawaan, tanpa ubahan) |
+| tasks | 1 | transactions | 3 |
+| events | 1 | debts | 4 (semua piutang) |
+| ideas | 2 | bills | 3 |
+| `recurring` | 0 | `focus` | 0 |
+| lainnya | 0 | tomb | 8 penghapusan |
+
+### 10.1 Temuan
+1. **Ada versi app yang tidak tercatat di git.** Koleksi `recurring` dan `focus` tidak ada di `COLLS` commit mana pun (semua 19 commit sudah diperiksa). Nilai `geminiModel` juga sudah diganti pengguna. Artinya versi yang ter-deploy dan dipakai lebih baru dari `1be7928`. Satu catatan transaksi berbentuk "NAMA TOKO · barang 1, barang 2, barang 3" yang mirip hasil baca struk, sehingga **kemungkinan fitur struk sudah ada di versi itu**. Pernyataan "struk belum ada" di Bagian 6 hanya berlaku untuk kode di git.
+2. **Saldo awal bukan bilangan bulat.** Satu akun bank punya `open` dengan pecahan sen (`.94`). SPEC mewajibkan integer rupiah.
+3. **Tanggal transaksi mencurigakan.** Satu transaksi bertanggal 2024-11-15, padahal app baru dibuat 2026-11-14 dan dua transaksi lain di 2026. Kemungkinan salah baca tahun dari struk.
+4. **Semester tanpa tanggal.** `sem = 7`, `semStart` dan `semEnd` kosong. Di app lama ini berarti kelas tampil setiap minggu tanpa batas.
+5. **Tagihan tanpa akun default.** Ketiga tagihan punya `acc` kosong.
+6. Rencana kerja tugas punya jam mulai tanpa jam selesai. Acara punya rentang dua hari dengan jam mulai dan selesai.
+7. Hal yang aman: tidak ada referensi patah (semua `course`, `acc`, `cat` mengarah ke record yang ada), tidak ada transfer, tidak ada grup biaya admin, sinkron nonaktif, kunci Gemini dan kode sinkron sudah kosong.
