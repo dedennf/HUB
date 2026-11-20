@@ -1,0 +1,143 @@
+# DECISIONS.md
+
+Catatan keputusan teknis, terutama yang menyimpang dari `SPEC.md`. Status:
+- **Diputuskan**: agen coding memutuskan sendiri (boleh dibatalkan, tidak merusak data).
+- **Perlu persetujuan pemilik**: tidak bisa dibatalkan atau menyangkut data. Belum dikerjakan sebelum pemilik menjawab.
+
+Rujukan temuan ada di `docs/AUDIT.md`.
+
+---
+
+## D-01 · Kode aplikasi lama dihapus dari `main`
+**Status: Perlu persetujuan pemilik**
+
+Konteks: semua file aplikasi dihapus dari HEAD lewat 11 commit "Delete ..." (AUDIT Bagian 1). Versi utuh terakhir ada di commit `1be7928`.
+
+Usulan:
+1. Pemilik mengecek dashboard Vercel apakah production sudah ikut kosong.
+2. Di awal Fase 1, pulihkan kode lama dari `1be7928` ke folder `legacy/` dan sajikan apa adanya (misalnya di `/legacy`) sampai app baru setara. Dengan begitu `api/sync.js` dan `api/gemini.js` hidup lagi dan perangkat bisa sinkron terakhir kali sebelum migrasi.
+3. Jika penghapusan memang disengaja dan pemilik tidak butuh app lama lagi, cukup pastikan cadangan JSON dari tiap perangkat sudah diunduh sebelum data browser dibersihkan.
+
+Pertanyaan untuk pemilik: penghapusan itu disengaja (mulai ulang) atau tidak sengaja?
+
+---
+
+## D-02 · Stack: Next.js App Router + TypeScript + Tailwind
+**Status: Diputuskan**
+
+SPEC 0.2 meminta mengikuti stack yang ada. Stack lama adalah vanilla JS tanpa build, satu file 2.500 baris dengan state global. Alasan tetap memakai Next.js:
+- Agen, registry tools, Zod, cron, push, dan RLS membutuhkan logika di server. Kode lama hampir seluruhnya logika klien.
+- Kode lama sudah tidak ada di HEAD, jadi tidak ada yang "dibongkar".
+- Logika bernilai dari kode lama tetap di-port ke modul TypeScript murni: pengurai nominal dan tanggal, pencocokan akun dan kategori, ekspansi kalender, aturan anggaran dan biaya sejati, `systemContext`.
+
+Fitur lama di AUDIT Bagian 7 menjadi daftar regresi wajib.
+
+---
+
+## D-03 · Database: Upstash Redis ke Supabase (Postgres)
+**Status: Perlu persetujuan pemilik** (ganti penyedia database, sesuai CLAUDE.md)
+
+SPEC Bagian 2 mengizinkan mempertahankan database lama yang sudah tersinkron. Rekomendasi tetap pindah ke Supabase karena:
+- Data di Upstash dienkripsi end-to-end di browser. Server, agen Gemini, `/api/cron/tick`, dan notifikasi tidak bisa membacanya.
+- Redis menyimpan satu blob per koleksi, tidak mendukung query, transaksi, RLS, atau `pg_cron`.
+
+Konsekuensi privasi: data tidak lagi terenkripsi end-to-end. Perlindungan berpindah ke RLS, Supabase Auth, dan enkripsi at-rest milik Supabase. Pemilik perlu menyetujui perubahan model privasi ini.
+
+Upstash tidak dihapus. Biarkan sampai migrasi terverifikasi, lalu pemilik yang memutuskan kapan menghapus.
+
+---
+
+## D-04 · Identitas dan ID
+**Status: Diputuskan**
+
+ID lama berupa string acak (`lt3k2abcde`, `o_makan`). Semua tabel baru memakai `uuid`. Saat migrasi dibuat tabel bantu `legacy_id_map (table_name, legacy_id, new_id)` agar relasi (transaksi ke akun, tugas ke mata kuliah, literatur ke target) bisa dipetakan dan migrasi bisa diulang tanpa duplikat.
+
+---
+
+## D-05 · Sumber migrasi: file cadangan JSON
+**Status: Diputuskan**
+
+Server tidak bisa membaca Upstash (D-03), maka migrasi memakai format cadangan yang sudah ada (`{ app: 'hub-pribadi', version: 1, data }`). Alur:
+1. Di app lama, sinkron terakhir di semua perangkat.
+2. Unduh cadangan dari perangkat paling lengkap.
+3. Halaman impor di app baru (setelah login) mengunggah file, menampilkan pratinjau jumlah per tabel, lalu menulis dalam satu transaksi database.
+4. Impor idempoten lewat `legacy_id_map`. File cadangan disimpan sebagai arsip.
+
+---
+
+## D-06 · Aturan konversi waktu saat migrasi
+**Status: Diputuskan**
+
+- Transaksi lama hanya punya tanggal. `occurred_at` diisi tanggal tersebut jam 12.00 Asia/Jakarta, agar tidak bergeser hari saat dikonversi ke UTC.
+- Tenggat tugas lama hanya tanggal. `due_at` diisi jam 23.59 Asia/Jakarta.
+- Rencana kerja (`work`, `workStart`, `workEnd`) menjadi satu baris `task_work_slots`. Jika jam kosong, dipakai 19.00 sampai 21.00 dan ditandai di catatan.
+- `schedule.day` lama (0 = Senin) menjadi `weekday` (1 = Senin).
+- Semua perhitungan tanggal di server memakai `APP_TIMEZONE`, bukan jam perangkat.
+
+---
+
+## D-07 · Saldo akun: saldo awal + saldo terpelihara
+**Status: Diputuskan**
+
+SPEC menyimpan `accounts.balance`. App lama hanya menyimpan saldo awal (`open`). Ditambahkan kolom `opening_balance bigint`. `balance` tetap diperbarui oleh fungsi database saat transaksi dibuat, diubah, dihapus, atau di-undo (sesuai SPEC), dan disediakan fungsi `recompute_account_balance(account_id)` = `opening_balance` + jumlah transaksi, untuk memeriksa konsistensi dan untuk fitur "Cocokkan saldo".
+
+---
+
+## D-08 · Fitur lama di luar SPEC tetap dipertahankan
+**Status: Diputuskan**
+
+Fitur berikut tidak ada di SPEC tetapi sudah dipakai, sehingga dipertahankan dan ditambahkan ke model data:
+
+| Fitur lama | Tabel / kolom baru |
+|---|---|
+| Target tabungan | `savings_goals (name, target_amount, saved_amount, deadline, note)` |
+| Utang dan piutang | `debts (direction, person, amount, paid_amount, occurred_on, due_on, note)` |
+| Biaya sejati | `sinking_funds (name, amount, due_on, saved_amount, is_done, note)` |
+| Libur | `holidays (name, start_date, end_date)` |
+| Bimbingan | `supervisions (met_on, supervisor, points, status, next_on)` |
+| Sub-kategori, ikon, warna, kata kunci | kolom tambahan di `categories`, `subcategory` di `transactions` |
+| Biaya admin transfer | `transactions.group_id` |
+| Jenis, prioritas, subtugas, tautan tugas | `tasks.kind, priority, parent_id, url` |
+| Status dan jenis kebutuhan riset | `research_needs.status, kind` menggantikan `is_fulfilled` |
+| Metadata literatur | `readings.venue, collection, tags, claim, verification_status, linked_target_ids, linked_idea_ids` |
+| Acara berulang | `events.recurrence, recurrence_until, location, end_date` |
+| Tagihan tahunan | `bills.frequency, category_id` |
+| Alias akun | `accounts.aliases text[]` diisi dari teks alias lama |
+| Catatan kebiasaan untuk Gemini | satu baris `agent_memory` `kind = 'preference'` |
+
+Semua tabel tambahan mengikuti aturan SPEC Bagian 5 (uuid, `user_id`, timestamp, RLS, nominal `bigint`).
+
+---
+
+## D-09 · Kategori bawaan memakai daftar lama
+**Status: Diputuskan**
+
+Daftar lama (14 pengeluaran, 7 pemasukan) sudah mencakup semua kategori bawaan SPEC dengan nama sedikit berbeda, ditambah Riset & lapangan, Organisasi, Hadiah & donasi, Biaya admin & pajak, Proyek atau freelance, Hasil investasi. Memakai daftar lama menjaga data lama tetap utuh. `Biaya admin & pajak` wajib ada karena dipakai biaya transfer.
+
+---
+
+## D-10 · Proyek riset default
+**Status: Diputuskan**
+
+Data riset lama tidak punya proyek. Migrasi membuat satu `research_projects` bernama "Riset utama" dan menautkan semua target, kebutuhan, ide, dan literatur ke sana. Pengguna bisa memecahnya nanti. `research_ideas.project_id` boleh null sesuai SPEC.
+
+---
+
+## D-11 · Pengurai lokal tetap ada sebagai jalur cadangan
+**Status: Diputuskan**
+
+SPEC 15 meminta app tetap bisa dipakai saat Gemini gagal. Pengurai lokal lama (nominal, tanggal relatif, akun, kategori) di-port ke `lib/parse/` dan dipakai untuk: (a) fallback saat Gemini error atau kuota habis, menghasilkan usulan aksi yang sama dengan agen, dan (b) normalisasi argumen tools di server (misalnya "30rb" ke 30000). Tetap tanpa eksekusi langsung, semua lewat kartu konfirmasi.
+
+---
+
+## D-12 · Mode kunci Gemini di browser dihapus
+**Status: Diputuskan**
+
+Mode `direct` menyimpan `GEMINI_API_KEY` di IndexedDB dan bertentangan dengan SPEC 12. App baru hanya memanggil Gemini dari server lewat SDK `@google/genai`, model dari env `GEMINI_MODEL`. Proxy umum `api/gemini.js` tidak dibawa ke app baru.
+
+---
+
+## D-13 · Manifest PWA
+**Status: Diputuskan**
+
+SPEC menyebut `public/manifest.json`. Nama file bebas, isi dipertahankan dari `manifest.webmanifest` lama (nama "Hub Pribadi", ikon 192/512/maskable). Warna tema diseragamkan karena manifest dan `index.html` lama berbeda. Cache service worker lama (`hub-pribadi-v4`) dibersihkan oleh service worker baru agar perangkat tidak terus menampilkan versi lama.
