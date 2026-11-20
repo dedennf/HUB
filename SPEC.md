@@ -749,14 +749,16 @@ Buat `.env.example` berisi daftar ini tanpa nilai.
 Setiap fase selesai jika semua kriteria terpenuhi, build lolos, dan preview Vercel sudah dicoba di laptop dan HP.
 
 **Fase 0 · Audit**
-- [ ] `docs/AUDIT.md` dan `docs/DECISIONS.md` dibuat
-- [ ] Daftar fitur lama yang wajib tetap berjalan
+- [x] `docs/AUDIT.md` dan `docs/DECISIONS.md` dibuat
+- [x] Daftar fitur lama yang wajib tetap berjalan (AUDIT Bagian 7)
 
-**Fase 1 · Fondasi Data dan Sinkron**
-- [ ] Supabase terpasang, migrasi semua tabel Bagian 5, RLS aktif
-- [ ] Auth satu pengguna
-- [ ] Data lama termigrasi tanpa hilang
-- [ ] Data yang diinput di laptop langsung terlihat di HP
+**Fase 1 · Fondasi Data dan Sinkron** (dibagi 1a dan 1b, lihat D-17)
+- [x] Supabase terpasang, migrasi semua tabel Bagian 5, RLS aktif. Diverifikasi di Supabase lokal (image resmi Postgres 17) dan `npm run test:db`. Tinggal `supabase db push` ke proyek pemilik.
+- [x] Auth satu pengguna. Diuji: email lain tidak dikirimi tautan, tautan valid milik pengguna lain ditolak, tautan bisa dibuka di perangkat lain.
+- [ ] Data lama termigrasi tanpa hilang. Importer selesai dan diuji dengan cadangan asli 2026-11-21 (54 data, 5 saldo cocok persis, impor ulang tidak menggandakan). Impor ke database production menunggu proyek Supabase pemilik.
+- [x] Data yang diinput di laptop langsung terlihat di HP. Diuji dua browser: transaksi baru muncul di HP tanpa reload dalam kurang dari 1 detik.
+- [ ] Preview Vercel dicoba di laptop dan HP (menunggu env Supabase di Vercel)
+- [ ] Fase 1b: fitur lama AUDIT Bagian 7 kembali berjalan
 
 **Fase 2 · Tools dan API**
 - [ ] Registry tools lengkap Bagian 6.8 dengan validasi Zod
