@@ -186,6 +186,8 @@ Magic link Supabase dengan tiga lapis pembatas: pendaftaran dimatikan di Supabas
 
 Template email memakai format `token_hash` (`supabase/templates/magic_link.html`) agar tautan bisa dibuka di perangkat lain, misalnya diminta dari laptop lalu dibuka di HP. Rute `/auth/confirm` juga menerima `?code=` dari template bawaan Supabase sebagai cadangan.
 
+Tautan di template memakai `{{ .RedirectTo }}`, bukan `{{ .SiteURL }}`. App mengirim `emailRedirectTo = <alamat yang sedang dibuka>/auth/confirm`, sehingga login juga berjalan di preview Vercel dan localhost, bukan hanya di domain production. Supabase hanya memakai alamat itu jika terdaftar di Redirect URLs. Alamat lain diganti Site URL.
+
 ## D-20 · Mekanisme impor
 **Status: Diputuskan**
 
