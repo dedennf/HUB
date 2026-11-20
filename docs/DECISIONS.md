@@ -9,7 +9,9 @@ Rujukan temuan ada di `docs/AUDIT.md`.
 ---
 
 ## D-01 · Kode aplikasi lama dihapus dari `main`
-**Status: Perlu persetujuan pemilik**
+**Status: Diputuskan pemilik (2026-11-20): penghapusan disengaja, kode lama tidak dipulihkan.**
+
+Akibatnya: app baru dibangun dari nol. Logika lama tetap boleh dirujuk dari riwayat git (`git show 1be7928:app.js`) untuk di-port. Migrasi data memakai file cadangan JSON yang diunduh pemilik dari perangkatnya (D-05). Usulan di bawah dicatat sebagai riwayat.
 
 Konteks: semua file aplikasi dihapus dari HEAD lewat 11 commit "Delete ..." (AUDIT Bagian 1). Versi utuh terakhir ada di commit `1be7928`.
 
@@ -35,7 +37,7 @@ Fitur lama di AUDIT Bagian 7 menjadi daftar regresi wajib.
 ---
 
 ## D-03 · Database: Upstash Redis ke Supabase (Postgres)
-**Status: Perlu persetujuan pemilik** (ganti penyedia database, sesuai CLAUDE.md)
+**Status: Disetujui pemilik (2026-11-20).** Data Upstash tetap tidak dihapus sampai migrasi terverifikasi.
 
 SPEC Bagian 2 mengizinkan mempertahankan database lama yang sudah tersinkron. Rekomendasi tetap pindah ke Supabase karena:
 - Data di Upstash dienkripsi end-to-end di browser. Server, agen Gemini, `/api/cron/tick`, dan notifikasi tidak bisa membacanya.
@@ -59,7 +61,7 @@ ID lama berupa string acak (`lt3k2abcde`, `o_makan`). Semua tabel baru memakai `
 
 Server tidak bisa membaca Upstash (D-03), maka migrasi memakai format cadangan yang sudah ada (`{ app: 'hub-pribadi', version: 1, data }`). Alur:
 1. Di app lama, sinkron terakhir di semua perangkat.
-2. Unduh cadangan dari perangkat paling lengkap.
+2. Unduh cadangan dari perangkat paling lengkap. Karena kode lama tidak dipulihkan (D-01), pemilik mengunduhnya dari app lama yang masih tersimpan di cache PWA perangkat. Jika app lama sudah tidak bisa dibuka, opsi darurat adalah menjalankan `1be7928` secara lokal di origin yang sama.
 3. Halaman impor di app baru (setelah login) mengunggah file, menampilkan pratinjau jumlah per tabel, lalu menulis dalam satu transaksi database.
 4. Impor idempoten lewat `legacy_id_map`. File cadangan disimpan sebagai arsip.
 
