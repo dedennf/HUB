@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f4f2ee;
+  --surface: #ffffff;
+  --ink: #1d2327;
+  --muted: #5f6b73;
+  --line: #e0ddd6;
+  --accent: #0e7c6b;
+  --accent-ink: #ffffff;
+  --danger: #b42318;
+  --positive: #1f7a4d;
+  --warn: #9a6700;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121517;
+    --surface: #1b1f22;
+    --ink: #e8eaeb;
+    --muted: #9aa5ad;
+    --line: #2c3236;
+    --accent: #2bb39b;
+    --accent-ink: #08201b;
+    --danger: #f97066;
+    --positive: #4ade80;
+    --warn: #e3b341;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
+  --color-positive: var(--positive);
+  --color-warn: var(--warn);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html { color-scheme: light dark; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  .card { @apply rounded-xl border border-line bg-surface p-4; }
+  .label { @apply mb-1 block text-xs font-medium text-muted; }
+  .input { @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-ink outline-none focus:border-accent; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent disabled:opacity-60; }
+  .btn-primary { @apply border-accent bg-accent text-accent-ink; }
+  .btn-danger { @apply border-danger text-danger; }
+  .btn-sm { @apply px-2 py-1 text-xs; }
+  .h2 { @apply mb-3 text-base font-semibold; }
+  .list > * + * { @apply border-t border-line; }
+  .row { @apply flex items-center justify-between gap-3 py-2; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs text-muted; }
+  .tab { @apply rounded-full border border-line px-3 py-1 text-sm whitespace-nowrap; }
+  .tab[aria-current="page"] { @apply border-accent bg-accent text-accent-ink; }
+}

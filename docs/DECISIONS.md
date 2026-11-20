@@ -162,3 +162,63 @@ Importer tidak mengubah isi data selain format. Record yang janggal (misalnya ta
 Cadangan memuat koleksi `recurring` dan `focus` yang tidak ada di kode git (AUDIT 10.1). Keduanya kosong, jadi tidak ada data yang hilang. Importer akan menolak dengan peringatan jika suatu saat koleksi tak dikenal berisi data, bukan membuangnya diam-diam.
 
 Kode versi terbaru itu sebaiknya diambil supaya fitur yang sudah dipakai (kemungkinan struk, transaksi berulang, dan mode fokus) masuk daftar regresi. Sumber yang mungkin: folder lokal di laptop pemilik, atau tab Source pada deployment terakhir di dashboard Vercel.
+
+---
+
+# Keputusan Fase 1
+
+## D-17 · Fase 1 dibagi 1a (fondasi) dan 1b (port UI)
+**Status: Disetujui pemilik (rencana Fase 1)**
+
+Kode app lama sudah dihapus (D-01), jadi tidak ada fitur lama yang berjalan. Fase 1a (branch `fase-1-fondasi-data`) berisi proyek Next.js, semua migrasi, RLS, login satu pengguna, impor cadangan, sinkron realtime, serta halaman baca untuk semua modul plus tambah dan ubah akun dan transaksi. Fase 1b mengembalikan seluruh 26 fitur di AUDIT Bagian 7 di atas database baru.
+
+Selama 1a belum ada mode offline. Service worker baru sengaja tidak meng-cache apa pun dan menghapus cache lama `hub-pribadi-v4`, supaya HP tidak terus menampilkan app lama. Cache offline dibangun ulang bersama push notification di Fase 6.
+
+## D-18 · Konvensi Next.js 16
+**Status: Diputuskan**
+
+Versi yang terpasang Next.js 16.4.6. Di versi ini `middleware.ts` sudah diganti `proxy.ts`, jadi penyegaran sesi Supabase ada di `proxy.ts`. `cacheComponents` dimatikan karena hampir semua halaman membaca sesi pengguna di setiap permintaan, sehingga cache tidak memberi manfaat dan hanya menambah aturan Suspense. `serverActions.bodySizeLimit` dinaikkan ke 5 MB untuk file cadangan.
+
+## D-19 · Login satu pengguna
+**Status: Diputuskan**
+
+Magic link Supabase dengan tiga lapis pembatas: pendaftaran dimatikan di Supabase, `shouldCreateUser: false`, dan email harus sama dengan env `OWNER_EMAIL` (dicek saat meminta tautan, saat tautan dibuka, dan di setiap halaman). Email selain pemilik mendapat pesan yang sama supaya tidak bisa dipakai menebak email.
+
+Template email memakai format `token_hash` (`supabase/templates/magic_link.html`) agar tautan bisa dibuka di perangkat lain, misalnya diminta dari laptop lalu dibuka di HP. Rute `/auth/confirm` juga menerima `?code=` dari template bawaan Supabase sebagai cadangan.
+
+## D-20 · Mekanisme impor
+**Status: Diputuskan**
+
+Transformasi dilakukan di TypeScript (`lib/legacy/transform.ts`, fungsi murni yang diuji). Hasilnya dikirim ke RPC `import_legacy_backup` yang menyisipkan semua tabel dalam satu transaksi database dengan `on conflict (id) do nothing`. RPC berjalan sebagai pengguna (SECURITY INVOKER) sehingga tetap tunduk pada RLS, dan hanya menerima daftar tabel yang sudah ditentukan.
+
+Nilai `transactions.source` ditambah `'import'` (SPEC hanya menyebut manual, agent, receipt, voice, automation) supaya data hasil migrasi bisa dibedakan.
+
+Saat impor:
+- Rencana kerja tugas yang punya jam mulai tanpa jam selesai diberi durasi 2 jam (melengkapi D-06).
+- `completed_at` tugas memakai `doneAt` jam 12.00 WIB.
+- Transaksi yang akunnya sudah terhapus di app lama dipindah ke akun arsip "Akun lama (terhapus)" supaya tidak ada yang hilang.
+
+## D-21 · Kalender gabungan sebagai fungsi TypeScript
+**Status: Diputuskan**
+
+SPEC 5.4 membolehkan view atau fungsi server. Dipilih `buildCalendarItems()` di `lib/calendar.ts` karena kelas mingguan dan acara berulang perlu diekspansi per hari, dan aturannya (kelas hanya di rentang semester dan dilewati saat libur, acara beberapa hari) lebih mudah diuji di TypeScript.
+
+## D-22 · Penyesuaian kolom terhadap SPEC 5
+**Status: Diputuskan**
+
+- `categories.slug` (unik per pengguna) untuk kategori bawaan, dipakai bootstrap dan impor.
+- `research_needs.is_fulfilled` dipertahankan sebagai kolom generated dari `status`, jadi kode yang mengikuti SPEC tetap bisa memakainya.
+- `readings.inclusion` (use, maybe, exclude) untuk field "Keputusan" literatur lama.
+- `tasks.status` tidak diubah menjadi `overdue` saat impor. Status itu diisi otomasi "Tugas lewat tenggat" di Fase 6, sementara UI menandai keterlambatan dari tanggal.
+- `accounts.balance` dikunci pemicu: nilai dari klien diabaikan, hanya pemicu transaksi dan perubahan `opening_balance` yang mengubahnya.
+- Tabel `legacy_id_map` dan `legacy_imports` ditambahkan untuk migrasi.
+
+## D-23 · Tipe database ditulis manual dulu
+**Status: Diputuskan, sementara**
+
+`lib/types.ts` ditulis tangan untuk kolom yang dipakai UI. Setelah proyek Supabase tersedia, ganti dengan hasil `npx supabase gen types typescript --linked > lib/database.types.ts` dan pasang ke klien.
+
+## D-24 · Branch Fase 1
+**Status: Diputuskan pemilik**
+
+Pemilik meminta branch `fase-1-fondasi-data`. Karena PR Fase 0 ([dedennf/HUB#1](https://github.com/dedennf/HUB/pull/1)) belum di-merge, branch ini dibuat dari branch Fase 0 sehingga PR Fase 1 juga memuat commit dokumen Fase 0 sampai PR #1 di-merge.
