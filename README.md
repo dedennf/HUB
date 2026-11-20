@@ -57,7 +57,8 @@ npx supabase db push
 
 Supabase lokal (butuh Docker): `npx supabase start`, lalu isi `.env.local` dengan URL dan anon key yang ditampilkan. Email tautan masuk bisa dilihat di Mailpit (`http://localhost:54324`).
 
-## Memindahkan data app lama
+## Memindahkan data app lama 
+ 
 
 1. Di app lama: Pengaturan, Data dan cadangan, Unduh cadangan (JSON).
 2. Di app baru: Pengaturan, Impor cadangan, pilih file.
