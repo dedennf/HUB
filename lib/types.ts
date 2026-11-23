@@ -40,7 +40,7 @@ export type CalendarEvent = {
 };
 
 export type ResearchProject = { id: string; title: string; status: string };
-export type ResearchTarget = { id: string; project_id: string | null; title: string; due_date: string | null; progress: number };
+export type ResearchTarget = { id: string; project_id: string | null; title: string; due_date: string | null; progress: number; last_touched_at?: string | null };
 export type ResearchNeed = { id: string; project_id: string | null; item: string; kind: string | null; status: string };
 export type ResearchIdea = { id: string; project_id: string | null; content: string; source: string | null; status: string };
 export type Reading = { id: string; title: string; authors: string | null; year: number | null; doi: string | null; verification_status: string };

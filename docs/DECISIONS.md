@@ -240,3 +240,47 @@ Perbaikan:
 Log production menunjukkan `permission denied for table ...` di semua tabel. Proyek Supabase baru bisa tidak otomatis memberi role `authenticated` hak atas tabel dan fungsi baru (pengaturan Data API), sedangkan migrasi 0001 sampai 0013 mengandalkan hak bawaan itu. Migrasi `0014_api_grants.sql` memberi GRANT eksplisit (select, insert, update, delete untuk `authenticated`, semua untuk `service_role`, execute fungsi) dan default privileges untuk migrasi berikutnya. Baris tetap dibatasi RLS. Tiruan Supabase di `supabase/tests/00_supabase_stub.sql` sekarang juga tidak memberi hak bawaan, sehingga kesalahan seperti ini tertangkap `npm run test:db`.
 
 Log yang sama menunjukkan sesi lama tidak pernah terhapus setelah ditolak sebagai bukan pemilik, karena `signOut()` dipanggil dari layout (Server Component tidak boleh mengubah cookie). `requireUser()` kini mengalihkan ke Route Handler `/auth/reject` yang menghapus sesi lalu menuju `/login?error=not_owner`.
+
+---
+
+# Keputusan Fase 1b · Desain
+
+## D-27 · Nama fase dan definisi angka di Beranda
+**Status: Diputuskan (pemilik meminta Fase 1b Desain sebelum Fase 2)**
+
+- Fase 1b = **Desain** (penerapan `docs/DESIGN.md`). Pekerjaan yang dulu disebut 1b (input di semua modul, dock input cepat, kalender bulan dan minggu, ekspor cadangan) bergeser menjadi usulan **Fase 1c**, menunggu persetujuan pemilik.
+- **Uang siap pakai** = saldo semua akun aktif selain akun investasi.
+- **Kekayaan bersih** = semua akun aktif + nilai investasi + sisa piutang − sisa utang.
+- **"▲ x% bulan ini"** = arus masuk dan keluar akun sejak awal bulan dibagi kekayaan bersih awal bulan. Nilai investasi dan utang dianggap tetap sepanjang bulan karena riwayatnya belum dicatat. Tidak ditampilkan bila belum ada transaksi bulan ini.
+- **Grafik 1B, 3B, 6B, 1T** = saldo uang siap pakai per hari, dihitung mundur dari saldo sekarang memakai transaksi. Rentang tanpa transaksi tidak digambar ("Belum ada transaksi dalam …"). Sumbu Y diberi rentang minimum 10% supaya perubahan kecil tidak tampak dramatis.
+- Kartu briefing diberi judul **"Hari ini"**, bukan "Briefing pagi · Ra", karena isinya disusun dari data tanpa Ra. Tombol aksinya hanya yang berfungsi (Lihat, Bayar, Ulang). Briefing dari Ra hadir di Fase 6.
+- Tombol Struk dan Suara membuka Ra ("Ra segera hadir"). Tombol Catat dan Transfer membuka form transaksi.
+- Kotak pencarian di Beranda laptop dan ikon cari di Uang tidak dipasang karena fitur pencarian belum ada. Tombol "+" di Agenda dan "Cocokkan saldo" di Uang menunggu Fase 1c.
+- Nama dan program studi untuk sapaan disimpan di `settings` (`profile_name`, `profile_program`) dan diubah di Saya, Profil.
+
+## D-28 · Kontras warna: token tambahan di luar DESIGN 2.1
+**Status: Diputuskan**
+
+DESIGN 2.1 memasangkan `--on-accent` `#FFFFFF` dengan `--accent` gelap `#12A58C` (kontras 3,1:1), padahal DESIGN juga mewajibkan kontras teks minimal 4,5:1. Ditambahkan dua token:
+- `--accent-fill`: latar berisi teks putih (tombol primer, tab rentang aktif, tanggal terpilih, tombol Ra). Terang `#0E7C6B`, gelap `#0E7C6B` (5,1:1).
+- `--accent-strong`: teks accent di atas `--accent-soft` (menu sidebar aktif). Terang `#0A5E51`, gelap `#3CC2A9`.
+
+`--accent` tetap dipakai untuk teks, ikon, garis, dan bar progres. Semua halaman lolos pemeriksaan axe-core WCAG 2 AA di mode terang dan gelap.
+
+Token lain yang ditambahkan karena dibutuhkan komponen DESIGN 6 tetapi tidak tercantum di tabel 2.1: warna avatar akun (`--av-*`, dari mockup Uang, dengan pasangan gelap), warna toast undo, overlay sheet, dan warna kategori "acara" (`--cat-event`).
+
+## D-29 · Penyimpanan tema, privasi, dan panel Ra
+**Status: Diputuskan**
+
+- Tema: `settings.theme` (lintas perangkat) dan `localStorage` `kompas-theme`. Skrip kecil di `<head>` memasang tema sebelum halaman tampil sehingga tidak berkedip. Bila pilihan di database berbeda (diubah dari perangkat lain), `ThemeSync` menyesuaikan.
+- Privasi saldo: `localStorage` `kompas-privacy`, per perangkat sesuai DESIGN 4. Grafik saldo ikut disembunyikan.
+- Panel Ra laptop yang diciutkan: `localStorage` `kompas-ra-collapsed`.
+
+## D-30 · Komponen Ra tanpa data asli dan undo manual
+**Status: Diputuskan**
+
+- RaSheet, RaPanel, dan RaInputBar tampil di app dengan "Ra segera hadir". Input Ra bisa difokuskan (Ctrl+K) tetapi belum mengirim apa pun.
+- ChatBubble, ActionCard, ActionBar, OfflineBanner, RecordingView, dan ReceiptScanning belum punya data asli. Keenamnya dipajang di `/dev/komponen` yang hanya ada saat pengembangan (404 di production), sehingga tidak ada data contoh di app sungguhan (DESIGN 8).
+- UndoToast sudah dipakai sungguhan: setelah mencatat transaksi manual, tombol Batalkan selama 10 detik menghapus transaksi itu (saldo ikut kembali lewat pemicu).
+- Flashcard dan StatTile ditunda ke fase Bahasa Inggris karena belum ada halaman yang memakainya.
+- Mencentang tugas di TaskRow langsung menyimpan status (aksi pengguna sendiri, bukan usulan Ra).

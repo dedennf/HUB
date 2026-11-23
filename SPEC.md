@@ -760,6 +760,20 @@ Setiap fase selesai jika semua kriteria terpenuhi, build lolos, dan preview Verc
 - [ ] Preview Vercel dicoba di laptop dan HP (menunggu env Supabase di Vercel)
 - [ ] Fase 1b: fitur lama AUDIT Bagian 7 kembali berjalan
 
+**Fase 1b · Desain** (ditambahkan pemilik, panduan di `docs/DESIGN.md`)
+- [x] Token warna, font, dan mode gelap terpasang
+- [x] Nama Kompas dan Ra menggantikan Hub Pribadi dan Asisten di UI, manifest, ikon, dan email login
+- [x] Navigasi HP lima slot dan tata letak laptop tiga kolom
+- [x] Beranda, Uang (Ringkasan, Transaksi, Rencana, Investasi), Agenda, Saya, dan Riset memakai komponen DESIGN dengan data asli
+- [x] Mode privasi saldo dan pengaturan tema tersimpan
+- [x] `/bahasa` dan `/otomasi` dengan keadaan kosong
+- [x] Target sentuh ≥ 44 px, lolos axe-core WCAG 2 AA, bisa dipakai dengan keyboard (Ctrl+K)
+- [x] Dicek di 390 px dan 1440 px, terang dan gelap (Supabase lokal, D-27 sampai D-30)
+
+**Fase 1c · Port fitur lama** (usulan, menunggu persetujuan pemilik)
+- [ ] Input di semua modul: tugas, mata kuliah, jadwal, materi, acara, libur, riset, tagihan dan Bayar, utang, budget, target tabungan, investasi, kategori
+- [ ] Dock input cepat dengan pengurai lokal, Cocokkan saldo, kalender bulan dan minggu, ekspor cadangan JSON dan CSV
+
 **Fase 2 · Tools dan API**
 - [ ] Registry tools lengkap Bagian 6.8 dengan validasi Zod
 - [ ] Resolusi nama ke id (akun, mata kuliah, proyek, tugas) termasuk alias

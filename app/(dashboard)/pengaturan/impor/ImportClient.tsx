@@ -1,9 +1,10 @@
 'use client';
 import Link from 'next/link';
+import { ImportPreview } from '@/components/ui/ImportPreview';
 import { useState, useTransition } from 'react';
 import { formatRupiah } from '@/lib/money';
 import type { ImportOverrides } from '@/lib/legacy/schema';
-import { previewImport, runImport, type ImportOutcome, type ImportPreview } from './actions';
+import { previewImport, runImport, type ImportOutcome, type ImportPreview as PreviewData } from './actions';
 
 const LABEL: Record<string, string> = {
   accounts: 'Akun', categories: 'Kategori', transactions: 'Transaksi', investments: 'Investasi', bills: 'Tagihan',
@@ -19,7 +20,7 @@ const EMPTY: ImportOverrides = { transactionDates: {}, semesterDates: {}, billAc
 export function ImportClient() {
   const [text, setText] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [preview, setPreview] = useState<PreviewData | null>(null);
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
   const [error, setError] = useState('');
   const [overrides, setOverrides] = useState<ImportOverrides>(EMPTY);
@@ -59,18 +60,18 @@ export function ImportClient() {
     const allMatch = outcome.balances.every((b) => b.actual === b.expected);
     return (
       <div className="grid gap-4">
-        <div className="card">
-          <h2 className="h2">Impor selesai</h2>
-          <p className="text-sm">{Object.entries(outcome.inserted).filter(([, n]) => n > 0).map(([t, n]) => `${label(t)} ${n}`).join(', ') || 'Tidak ada data baru (semua sudah pernah diimpor).'}</p>
+        <div className="card p-4">
+          <h2 className="h-section mb-2">Impor selesai</h2>
+          <p className="text-[13px]">{Object.entries(outcome.inserted).filter(([, n]) => n > 0).map(([t, n]) => `${label(t)} ${n}`).join(', ') || 'Tidak ada data baru (semua sudah pernah diimpor).'}</p>
         </div>
-        <div className="card">
-          <h2 className="h2">Pencocokan saldo dengan app lama</h2>
-          <p className={`mb-2 text-sm ${allMatch ? 'text-positive' : 'text-danger'}`}>{allMatch ? 'Semua saldo cocok.' : 'Ada saldo yang berbeda. Periksa transaksi akun tersebut.'}</p>
-          <div className="list">
+        <div className="card p-4">
+          <h2 className="h-section mb-2">Pencocokan saldo dengan app lama</h2>
+          <p className={`mb-2 text-[13px] font-semibold ${allMatch ? 'text-positive' : 'text-negative'}`}>{allMatch ? 'Semua saldo cocok.' : 'Ada saldo yang berbeda. Periksa transaksi akun tersebut.'}</p>
+          <div className="rows">
             {outcome.balances.map((b) => (
-              <div key={b.name} className="row text-sm">
+              <div key={b.name} className="flex min-h-11 items-center justify-between gap-3 text-[13px]">
                 <span>{b.name}</span>
-                <span className={b.actual === b.expected ? '' : 'text-danger'}>{b.actual == null ? 'tidak ditemukan' : formatRupiah(b.actual)} (app lama {formatRupiah(b.expected)})</span>
+                <span className={b.actual === b.expected ? '' : 'text-negative'}>{b.actual == null ? 'tidak ditemukan' : formatRupiah(b.actual)} (app lama {formatRupiah(b.expected)})</span>
               </div>
             ))}
           </div>
@@ -82,35 +83,31 @@ export function ImportClient() {
 
   return (
     <div className="grid gap-4">
-      <div className="card">
+      <div className="card p-4">
         <label className="block">
           <span className="label">File cadangan (hub-pribadi-YYYY-MM-DD.json)</span>
           <input type="file" accept="application/json,.json" className="input" onChange={(e) => onFile(e.target.files?.[0])} />
         </label>
-        <p className="mt-2 text-xs text-muted">File hanya dibaca untuk impor dan tidak disimpan di server.</p>
+        <p className="mt-2 text-[12px] text-muted">File hanya dibaca untuk impor dan tidak disimpan di server.</p>
       </div>
-      {pending && <p className="text-sm text-muted">Memproses...</p>}
-      {error && <p className="rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {pending && <p className="text-[13px] text-muted">Memproses...</p>}
+      {error && <p role="alert" className="rounded-xl bg-danger-bg p-3 text-[13px] text-danger-fg">{error}</p>}
       {preview && text && (
         <>
-          <div className="card">
-            <h2 className="h2">Isi {fileName}</h2>
-            {preview.exported && <p className="mb-2 text-xs text-muted">Diekspor {new Date(preview.exported).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB</p>}
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(preview.counts).map(([t, c]) => (
-                <span key={t} className="chip">{label(t)}: {c.total}{c.new !== c.total ? ` (${c.new} baru)` : ''}</span>
-              ))}
-            </div>
-          </div>
+          <ImportPreview
+            fileName={fileName}
+            exported={preview.exported ? `${new Date(preview.exported).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB` : null}
+            counts={Object.entries(preview.counts).map(([t, c]) => ({ label: label(t), total: c.total, fresh: c.new }))}
+          />
           {preview.blockers.length > 0 && (
-            <div className="card border-danger"><h2 className="h2 text-danger">Impor tidak bisa dilanjutkan</h2>{preview.blockers.map((b) => <p key={b} className="text-sm">{b}</p>)}</div>
+            <div role="alert" className="card p-4"><h2 className="h-section mb-2 text-negative">Impor tidak bisa dilanjutkan</h2>{preview.blockers.map((b) => <p key={b} className="text-[13px]">{b}</p>)}</div>
           )}
           {preview.warnings.length > 0 && (
-            <div className="card border-warn">
-              <h2 className="h2">Perlu dicek ({preview.warnings.length})</h2>
+            <div className="card p-4">
+              <h2 className="h-section mb-2">Perlu dicek ({preview.warnings.length})</h2>
               <ul className="grid gap-3">
                 {preview.warnings.map((w) => (
-                  <li key={w.key} className="rounded-lg bg-warn/10 p-3 text-sm">
+                  <li key={w.key} className="rounded-xl bg-warn-bg p-3 text-[13px] text-warn-fg">
                     <p>{w.text}</p>
                     {w.fix === 'tx_date' && w.ref && (
                       <label className="mt-2 block"><span className="label">Tanggal yang benar (kosongkan jika memang benar)</span>
@@ -135,10 +132,10 @@ export function ImportClient() {
               <button className="btn mt-3" disabled={pending} onClick={() => check(text, overrides)}>Periksa ulang dengan perbaikan</button>
             </div>
           )}
-          <div className="card">
-            <p className="mb-3 text-sm">{preview.newRows} data baru akan disimpan dalam satu langkah. Jika gagal, tidak ada yang tersimpan.</p>
+          <div className="card p-4">
+            <p className="mb-3 text-[13px]">{preview.newRows} data baru akan disimpan dalam satu langkah. Jika gagal, tidak ada yang tersimpan.</p>
             <button className="btn btn-primary" disabled={pending || preview.blockers.length > 0 || preview.newRows === 0} onClick={doImport}>
-              {preview.newRows === 0 ? 'Semua data sudah pernah diimpor' : 'Impor sekarang'}
+              {preview.newRows === 0 ? 'Semua data sudah pernah diimpor' : 'Impor data'}
             </button>
           </div>
         </>

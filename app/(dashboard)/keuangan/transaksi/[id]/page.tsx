@@ -1,6 +1,5 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { PageTitle, Section } from '@/components/ui';
+import { PageHeader } from '@/components/ui/Section';
 import { db, getAccounts, getCategories, getTransaction } from '@/lib/data';
 import { zonedParts } from '@/lib/time';
 import { DeleteTransactionButton } from '../../DeleteTransactionButton';
@@ -14,15 +13,16 @@ export default async function EditTransactionPage({ params }: PageProps<'/keuang
   if (!tx) notFound();
   const { date, time } = zonedParts(tx.occurred_at);
   return (
-    <>
-      <PageTitle title="Ubah transaksi" right={<Link href="/keuangan?tab=transaksi" className="btn btn-sm">Kembali</Link>} />
-      <div className="grid gap-4">
-        <Section title="Detail">
-          <TransactionForm accounts={accounts} categories={categories} initial={{ ...tx, date, time }} />
-          {tx.group_id && <p className="mt-3 text-xs text-muted">Transaksi ini satu grup dengan biaya admin transfer. Ubah keduanya jika perlu.</p>}
-        </Section>
-        <Section title="Hapus"><DeleteTransactionButton id={tx.id} /></Section>
-      </div>
-    </>
+    <div className="flex max-w-2xl flex-col gap-4">
+      <PageHeader title="Ubah transaksi" back={{ href: '/keuangan?tab=transaksi', label: 'Uang' }} />
+      <section className="card p-4">
+        <TransactionForm accounts={accounts} categories={categories} initial={{ ...tx, date, time }} />
+        {tx.group_id && <p className="mt-3 text-[12px] text-muted">Transaksi ini satu grup dengan biaya admin transfer. Ubah keduanya jika perlu.</p>}
+      </section>
+      <section className="card p-4">
+        <h2 className="h-section mb-2">Hapus</h2>
+        <DeleteTransactionButton id={tx.id} />
+      </section>
+    </div>
   );
 }

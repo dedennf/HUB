@@ -195,11 +195,11 @@ Aturan semua komponen:
 
 ## 9. Kriteria Selesai Fase Desain
 
-- [ ] Token warna, font, dan mode gelap terpasang di `globals.css`
-- [ ] Nama Kompas dan Ra menggantikan Hub Pribadi dan Asisten di seluruh UI, manifest, dan ikon
-- [ ] Navigasi HP lima slot dan tata letak laptop tiga kolom berjalan
-- [ ] Halaman Beranda, Uang (Ringkasan + Rencana), Agenda, Saya, dan Riset memakai komponen bagian 6 dengan data asli
-- [ ] Mode privasi saldo dan pengaturan tema berfungsi dan tersimpan
-- [ ] Halaman `/bahasa` dan `/otomasi` ada dengan keadaan kosong
-- [ ] Semua target sentuh ≥ 44 px, kontras lolos, bisa dipakai dengan keyboard
-- [ ] Dicek di lebar 390 px (HP) dan 1440 px (laptop), mode terang dan gelap
+- [x] Token warna, font, dan mode gelap terpasang di `globals.css`
+- [x] Nama Kompas dan Ra menggantikan Hub Pribadi dan Asisten di seluruh UI, manifest, dan ikon
+- [x] Navigasi HP lima slot dan tata letak laptop tiga kolom berjalan
+- [x] Halaman Beranda, Uang (Ringkasan + Rencana), Agenda, Saya, dan Riset memakai komponen bagian 6 dengan data asli
+- [x] Mode privasi saldo dan pengaturan tema berfungsi dan tersimpan
+- [x] Halaman `/bahasa` dan `/otomasi` ada dengan keadaan kosong
+- [x] Semua target sentuh ≥ 44 px, kontras lolos, bisa dipakai dengan keyboard
+- [x] Dicek di lebar 390 px (HP) dan 1440 px (laptop), mode terang dan gelap

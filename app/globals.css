@@ -1,67 +1,231 @@
 @import "tailwindcss";
 
+/*
+ * Token desain Kompas (docs/DESIGN.md bagian 2). Komponen TIDAK boleh menulis hex langsung.
+ * Tema: data-theme="light" | "dark" di <html>. Tanpa atribut = ikut sistem.
+ */
 :root {
-  --bg: #f4f2ee;
-  --surface: #ffffff;
-  --ink: #1d2327;
-  --muted: #5f6b73;
-  --line: #e0ddd6;
-  --accent: #0e7c6b;
-  --accent-ink: #ffffff;
-  --danger: #b42318;
-  --positive: #1f7a4d;
-  --warn: #9a6700;
+  --bg: #F5F6F8;
+  --surface: #FFFFFF;
+  --text: #111827;
+  --muted: #5B6472;
+  --border: #E3E6EB;
+  --divider: #EEF0F3;
+  --track: #E9ECF0;
+  --accent: #0E7C6B;
+  --accent-strong: #0A5E51;
+  --accent-soft: #E7F3F1;
+  --accent-fill: #0E7C6B;
+  --on-accent: #FFFFFF;
+  --positive: #0A7D45;
+  --negative: #C2362B;
+  --warn-bg: #FEF3C7;
+  --warn-fg: #8A4B08;
+  --info-bg: #DBEAFE;
+  --info-fg: #1E40AF;
+  --ok-bg: #DCFCE7;
+  --ok-fg: #166534;
+  --danger-bg: #FDECEA;
+  --danger-fg: #9B1C12;
+  --cat-class: #2563EB;
+  --cat-task: #D97706;
+  --cat-bill: #7C3AED;
+  --cat-study: var(--accent);
+  --cat-event: #5B6472;
+  --av-bank-bg: #DBEAFE;
+  --av-bank-fg: #1D4ED8;
+  --av-ewallet-bg: #DCFCE7;
+  --av-ewallet-fg: #15803D;
+  --av-cash-bg: #FEF3C7;
+  --av-cash-fg: #B45309;
+  --av-invest-bg: #EDE9FE;
+  --av-invest-fg: #6D28D9;
+  --toast-bg: #111827;
+  --toast-fg: #F9FAFB;
+  --overlay: rgba(17, 24, 39, 0.45);
+  --shadow-card: 0 1px 2px rgba(17, 24, 39, 0.06);
+  --card-border: transparent;
+  --shadow-ra: 0 6px 16px rgba(14, 124, 107, 0.35);
+  color-scheme: light;
 }
 
+:root[data-theme="dark"] {
+  --bg: #0D1412;
+  --surface: #17211F;
+  --text: #E6ECEA;
+  --muted: #9DAAA6;
+  --border: #2A3734;
+  --divider: #24302D;
+  --track: #2A3734;
+  --accent: #12A58C;
+  --accent-strong: #3CC2A9;
+  --accent-soft: #16332D;
+  --accent-fill: #0E7C6B; /* latar berisi teks putih: kontras 5,1:1 (D-28) */
+  --on-accent: #FFFFFF;
+  --positive: #4ADE9A;
+  --negative: #FF8A80;
+  --warn-bg: #3A2E12;
+  --warn-fg: #F5B547;
+  --info-bg: #1C2A4A;
+  --info-fg: #9DBBFF;
+  --ok-bg: #14301F;
+  --ok-fg: #4ADE9A;
+  --danger-bg: #3A1714;
+  --danger-fg: #FF8A80;
+  --cat-class: #7AA7FF;
+  --cat-task: #F5B547;
+  --cat-bill: #B79BFF;
+  --cat-event: #9DAAA6;
+  --av-bank-bg: #1C2A4A;
+  --av-bank-fg: #9DBBFF;
+  --av-ewallet-bg: #14301F;
+  --av-ewallet-fg: #4ADE9A;
+  --av-cash-bg: #3A2E12;
+  --av-cash-fg: #F5B547;
+  --av-invest-bg: #2A2145;
+  --av-invest-fg: #B79BFF;
+  --toast-bg: #E6ECEA;
+  --toast-fg: #0D1412;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow-card: none;
+  --card-border: var(--border);
+  --shadow-ra: 0 6px 16px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+/* Otomatis: ikut sistem bila pengguna tidak memilih Terang. Nilai sama dengan blok di atas. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #121517;
-    --surface: #1b1f22;
-    --ink: #e8eaeb;
-    --muted: #9aa5ad;
-    --line: #2c3236;
-    --accent: #2bb39b;
-    --accent-ink: #08201b;
-    --danger: #f97066;
-    --positive: #4ade80;
-    --warn: #e3b341;
+  :root:not([data-theme="light"]) {
+    --bg: #0D1412;
+    --surface: #17211F;
+    --text: #E6ECEA;
+    --muted: #9DAAA6;
+    --border: #2A3734;
+    --divider: #24302D;
+    --track: #2A3734;
+    --accent: #12A58C;
+    --accent-strong: #3CC2A9;
+    --accent-soft: #16332D;
+  --accent-fill: #0E7C6B; /* latar berisi teks putih: kontras 5,1:1 (D-28) */
+    --on-accent: #FFFFFF;
+    --positive: #4ADE9A;
+    --negative: #FF8A80;
+    --warn-bg: #3A2E12;
+    --warn-fg: #F5B547;
+    --info-bg: #1C2A4A;
+    --info-fg: #9DBBFF;
+    --ok-bg: #14301F;
+    --ok-fg: #4ADE9A;
+    --danger-bg: #3A1714;
+    --danger-fg: #FF8A80;
+    --cat-class: #7AA7FF;
+    --cat-task: #F5B547;
+    --cat-bill: #B79BFF;
+    --cat-event: #9DAAA6;
+    --av-bank-bg: #1C2A4A;
+    --av-bank-fg: #9DBBFF;
+    --av-ewallet-bg: #14301F;
+    --av-ewallet-fg: #4ADE9A;
+    --av-cash-bg: #3A2E12;
+    --av-cash-fg: #F5B547;
+    --av-invest-bg: #2A2145;
+    --av-invest-fg: #B79BFF;
+    --toast-bg: #E6ECEA;
+    --toast-fg: #0D1412;
+    --overlay: rgba(0, 0, 0, 0.6);
+    --shadow-card: none;
+  --card-border: var(--border);
+    --shadow-ra: 0 6px 16px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
   }
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
-  --color-ink: var(--ink);
+  --color-fg: var(--text);
   --color-muted: var(--muted);
-  --color-line: var(--line);
+  --color-line: var(--border);
+  --color-divider: var(--divider);
+  --color-track: var(--track);
   --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
-  --color-danger: var(--danger);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fill: var(--accent-fill);
+  --color-on-accent: var(--on-accent);
   --color-positive: var(--positive);
-  --color-warn: var(--warn);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-negative: var(--negative);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-fg: var(--warn-fg);
+  --color-info-bg: var(--info-bg);
+  --color-info-fg: var(--info-fg);
+  --color-ok-bg: var(--ok-bg);
+  --color-ok-fg: var(--ok-fg);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-fg: var(--danger-fg);
+  --color-cat-class: var(--cat-class);
+  --color-cat-task: var(--cat-task);
+  --color-cat-bill: var(--cat-bill);
+  --color-cat-study: var(--cat-study);
+  --color-cat-event: var(--cat-event);
+  --color-toast-bg: var(--toast-bg);
+  --color-toast-fg: var(--toast-fg);
+  --color-overlay: var(--overlay);
+  --shadow-card: var(--shadow-card);
+  --shadow-ra: var(--shadow-ra);
+  --color-card-line: var(--card-border);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-jakarta), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --breakpoint-lg: 64rem;
 }
 
-html { color-scheme: light dark; }
-body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  -webkit-tap-highlight-color: transparent;
+/* Aturan dasar wajib di dalam layer base agar kelas utilitas (mis. text-accent pada <a>) tetap menang. */
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  a { color: inherit; text-decoration: none; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+}
+@utility num {
+  font-variant-numeric: tabular-nums;
 }
 
 @layer components {
-  .card { @apply rounded-xl border border-line bg-surface p-4; }
-  .label { @apply mb-1 block text-xs font-medium text-muted; }
-  .input { @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-ink outline-none focus:border-accent; }
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink hover:border-accent disabled:opacity-60; }
-  .btn-primary { @apply border-accent bg-accent text-accent-ink; }
-  .btn-danger { @apply border-danger text-danger; }
-  .btn-sm { @apply px-2 py-1 text-xs; }
-  .h2 { @apply mb-3 text-base font-semibold; }
-  .list > * + * { @apply border-t border-line; }
-  .row { @apply flex items-center justify-between gap-3 py-2; }
-  .chip { @apply inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs text-muted; }
-  .tab { @apply rounded-full border border-line px-3 py-1 text-sm whitespace-nowrap; }
-  .tab[aria-current="page"] { @apply border-accent bg-accent text-accent-ink; }
+  .card { background: var(--surface); border: 1px solid var(--card-border); border-radius: 16px; box-shadow: var(--shadow-card); }
+  @media (min-width: 64rem) { .card { border-radius: 18px; } }
+
+  .label { @apply mb-1.5 block text-[12px] font-semibold text-muted; }
+  .input { @apply min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-[15px] text-fg outline-none placeholder:text-muted focus:border-accent; }
+  .btn { @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-4 text-[14px] font-semibold text-fg transition-colors hover:border-accent disabled:cursor-not-allowed disabled:opacity-50; }
+  .btn-primary { @apply border-accent-fill bg-accent-fill text-on-accent hover:opacity-90; }
+  .btn-danger { @apply border-danger-bg bg-danger-bg text-danger-fg; }
+  .h-page { @apply font-display text-[22px] font-extrabold leading-tight lg:text-[26px]; }
+  .h-section { @apply font-display text-[15px] font-bold lg:text-[16px]; }
+  .rows > * + * { border-top: 1px solid var(--divider); }
+}
+
+/* Animasi (DESIGN 7). Hormati prefers-reduced-motion: hanya fade. */
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes countdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes scan { 0% { top: 6%; } 100% { top: 90%; } }
+@keyframes pulse-ring { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.08); opacity: .6; } }
+.anim-sheet { animation: sheet-up 200ms ease-out; }
+.anim-fade { animation: fade-in 200ms ease-out; }
+.anim-toast { animation: toast-in 150ms ease-out; }
+.anim-countdown { transform-origin: left; animation: countdown 10s linear forwards; }
+.anim-scan { animation: scan 1.6s ease-in-out infinite alternate; }
+.anim-pulse { animation: pulse-ring 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-sheet, .anim-toast { animation: fade-in 150ms ease-out; }
+  .anim-scan, .anim-pulse { animation: none; }
+  .anim-countdown { animation: countdown 10s linear forwards; }
+  * { scroll-behavior: auto !important; }
 }
