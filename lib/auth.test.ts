@@ -45,9 +45,10 @@ describe('requireUser', () => {
     expect(auth.signOut).not.toHaveBeenCalled();
   });
 
-  it('pengguna lain: keluar dan ke not_owner', async () => {
+  it('pengguna lain: dialihkan ke /auth/reject yang menghapus cookie sesi', async () => {
     auth.getClaims.mockResolvedValue({ data: { claims: { sub: 'u2', email: 'lain@contoh.com' } }, error: null });
-    await expect(requireUser()).rejects.toThrow('REDIRECT:/login?error=not_owner');
-    expect(auth.signOut).toHaveBeenCalled();
+    await expect(requireUser()).rejects.toThrow('REDIRECT:/auth/reject');
+    // signOut di Server Component tidak berefek, jadi tidak dipanggil di sini
+    expect(auth.signOut).not.toHaveBeenCalled();
   });
 });

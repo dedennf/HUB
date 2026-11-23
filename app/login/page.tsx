@@ -4,7 +4,7 @@ import { LoginForm } from './LoginForm';
 export const metadata: Metadata = { title: 'Masuk' };
 
 const ERRORS: Record<string, string> = {
-  not_owner: 'Akun ini tidak punya akses ke Hub Pribadi.',
+  not_owner: 'Akun ini tidak punya akses ke Hub Pribadi. Masuk dengan email pemilik (sama dengan OWNER_EMAIL di server).',
   link: 'Tautan masuk tidak valid atau sudah kedaluwarsa. Minta tautan baru.',
   config: 'Server belum dikonfigurasi. Isi variabel Supabase di Vercel lalu deploy ulang.',
 };

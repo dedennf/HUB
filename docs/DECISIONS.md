@@ -233,3 +233,10 @@ Perbaikan:
 - `requireUser()` dan `proxy.ts` tetap memakai `getClaims()`, tetapi jatuh ke `getUser()` jika gagal atau klaim email tidak ada.
 - Setiap alasan gagal dicatat dengan `console.error` berawalan `[auth]` (terlihat di Vercel Logs). Token dan kode tidak pernah dicetak, dan email disamarkan (`pe***@domain`).
 - `OWNER_EMAIL` yang kosong di server kini menghasilkan `error=config`, bukan `not_owner`.
+
+## D-26 · GRANT eksplisit untuk role API dan logout lewat Route Handler
+**Status: Diputuskan (perbaikan bug production)**
+
+Log production menunjukkan `permission denied for table ...` di semua tabel. Proyek Supabase baru bisa tidak otomatis memberi role `authenticated` hak atas tabel dan fungsi baru (pengaturan Data API), sedangkan migrasi 0001 sampai 0013 mengandalkan hak bawaan itu. Migrasi `0014_api_grants.sql` memberi GRANT eksplisit (select, insert, update, delete untuk `authenticated`, semua untuk `service_role`, execute fungsi) dan default privileges untuk migrasi berikutnya. Baris tetap dibatasi RLS. Tiruan Supabase di `supabase/tests/00_supabase_stub.sql` sekarang juga tidak memberi hak bawaan, sehingga kesalahan seperti ini tertangkap `npm run test:db`.
+
+Log yang sama menunjukkan sesi lama tidak pernah terhapus setelah ditolak sebagai bukan pemilik, karena `signOut()` dipanggil dari layout (Server Component tidak boleh mengubah cookie). `requireUser()` kini mengalihkan ke Route Handler `/auth/reject` yang menghapus sesi lalu menuju `/login?error=not_owner`.
