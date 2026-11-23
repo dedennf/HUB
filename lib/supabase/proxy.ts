@@ -31,8 +31,14 @@ export async function updateSession(request: NextRequest) {
   });
 
   // Jangan menaruh kode lain di antara createServerClient dan getClaims.
-  const { data } = await supabase.auth.getClaims();
-  const signedIn = !!data?.claims?.sub;
+  const { data, error } = await supabase.auth.getClaims();
+  let signedIn = !!data?.claims?.sub;
+  if (!signedIn && error) {
+    // getClaims bisa gagal saat verifikasi token (JWKS). Tanya server Auth sebelum menganggap belum login.
+    console.error('[auth] proxy: getClaims gagal, mencoba getUser', { status: error.status, code: error.code, message: error.message });
+    const { data: u } = await supabase.auth.getUser();
+    signedIn = !!u.user;
+  }
 
   if (!signedIn && !isPublic) {
     const to = request.nextUrl.clone();

@@ -222,3 +222,14 @@ SPEC 5.4 membolehkan view atau fungsi server. Dipilih `buildCalendarItems()` di 
 **Status: Diputuskan pemilik**
 
 Pemilik meminta branch `fase-1-fondasi-data`. Karena PR Fase 0 ([dedennf/HUB#1](https://github.com/dedennf/HUB/pull/1)) belum di-merge, branch ini dibuat dari branch Fase 0 sehingga PR Fase 1 juga memuat commit dokumen Fase 0 sampai PR #1 di-merge.
+
+## D-25 · Identitas login tidak bergantung pada getClaims()
+**Status: Diputuskan (perbaikan bug)**
+
+Gejala: setelah membuka magic link, pemilik selalu diarahkan ke `/login?error=not_owner`. `getClaims()` memverifikasi ulang token (lewat JWKS atau `getUser`), dan jika verifikasi itu gagal ia mengembalikan `data: null` disertai error. Kode lama mengabaikan error tersebut sehingga email terbaca kosong.
+
+Perbaikan:
+- `/auth/confirm` mengambil email dari hasil `verifyOtp` / `exchangeCodeForSession` (`data.user`, cadangan `data.session.user`).
+- `requireUser()` dan `proxy.ts` tetap memakai `getClaims()`, tetapi jatuh ke `getUser()` jika gagal atau klaim email tidak ada.
+- Setiap alasan gagal dicatat dengan `console.error` berawalan `[auth]` (terlihat di Vercel Logs). Token dan kode tidak pernah dicetak, dan email disamarkan (`pe***@domain`).
+- `OWNER_EMAIL` yang kosong di server kini menghasilkan `error=config`, bukan `not_owner`.
