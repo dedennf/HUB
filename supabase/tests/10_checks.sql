@@ -59,6 +59,12 @@ do $$ begin
   exception when check_violation then null; end;
 end $$;
 
+-- RPC impor bisa dipanggil pengguna yang login (butuh GRANT execute, lihat 0014)
+do $$ begin
+  perform public.import_legacy_backup('{"tables": {"holidays": [{"id": "cccccccc-0000-0000-0000-000000000001", "name": "Libur uji", "start_date": "2026-12-25", "end_date": null}]}, "log": {"file_sha256": "uji"}}'::jsonb);
+  if (select count(*) from public.holidays) <> 1 then raise exception 'impor RPC gagal menyisipkan'; end if;
+end $$;
+
 -- Pengguna B tidak bisa melihat atau memakai akun A
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', false);
 do $$ begin
@@ -82,6 +88,12 @@ do $$ begin
   begin
     perform 1 from public.accounts;
     raise exception 'anon bisa membaca accounts';
+  exception when insufficient_privilege then null; end;
+end $$;
+do $$ begin
+  begin
+    perform public.bootstrap_user();
+    raise exception 'anon bisa menjalankan bootstrap_user';
   exception when insufficient_privilege then null; end;
 end $$;
 reset role;

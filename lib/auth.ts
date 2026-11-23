@@ -38,8 +38,8 @@ export async function requireUser(): Promise<CurrentUser> {
   if (!user) redirect('/login');
   if (!isOwnerEmail(user.email)) {
     logAuthFailure('requireUser', 'email bukan pemilik', { email: maskEmail(user.email), owner: maskEmail(process.env.OWNER_EMAIL?.trim()) });
-    await supabase.auth.signOut();
-    redirect('/login?error=not_owner');
+    // signOut() di Server Component tidak bisa menghapus cookie, jadi keluarkan lewat Route Handler.
+    redirect('/auth/reject');
   }
   return user;
 }
