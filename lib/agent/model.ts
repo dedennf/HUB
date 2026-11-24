@@ -20,7 +20,7 @@ export class ModelError extends Error {
 }
 
 export type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high' | 'off';
-export type GeminiConfig = { apiKey: string; model: string; baseUrl?: string; thinkingLevel?: ThinkingLevel };
+export type GeminiConfig = { apiKey: string; model: string; fallbackModel?: string; baseUrl?: string; thinkingLevel?: ThinkingLevel };
 
 /** Tingkat berpikir bawaan "low": Ra butuh jawaban cepat untuk perintah pendek (D-43). */
 export function readThinkingLevel(raw: string | undefined): ThinkingLevel {
@@ -33,7 +33,11 @@ export function geminiConfig(): GeminiConfig | null {
   const model = process.env.GEMINI_MODEL?.trim();
   if (!apiKey || !model) return null;
   // GEMINI_BASE_URL hanya untuk uji lokal dengan server tiruan. Jangan diisi di production.
-  return { apiKey, model, baseUrl: process.env.GEMINI_BASE_URL?.trim() || undefined, thinkingLevel: readThinkingLevel(process.env.GEMINI_THINKING_LEVEL) };
+  const fallbackModel = process.env.GEMINI_FALLBACK_MODEL?.trim();
+  return {
+    apiKey, model, fallbackModel: fallbackModel && fallbackModel !== model ? fallbackModel : undefined,
+    baseUrl: process.env.GEMINI_BASE_URL?.trim() || undefined, thinkingLevel: readThinkingLevel(process.env.GEMINI_THINKING_LEVEL),
+  };
 }
 
 /** Model yang menolak thinkingLevel (mis. generasi lama). Diingat selama proses server hidup. */
@@ -42,43 +46,57 @@ const noThinkingLevel = new Set<string>();
 export class GeminiModel implements AgentModel {
   private ai: GoogleGenAI;
   readonly name: string;
-
+  private fallbackModel?: string;
   private thinkingLevel: ThinkingLevel;
+  /** Model yang benar-benar menjawab giliran terakhir (utama atau cadangan), untuk log dan uji. */
+  lastServedBy: string | null = null;
 
   constructor(cfg: GeminiConfig) {
     // timeout juga dikirim ke Google sebagai X-Server-Timeout: lewat dari ini Google membalas 504 DEADLINE_EXCEEDED
     this.ai = new GoogleGenAI({ apiKey: cfg.apiKey, httpOptions: { timeout: 25_000, ...(cfg.baseUrl ? { baseUrl: cfg.baseUrl } : {}) } });
     this.name = cfg.model;
+    this.fallbackModel = cfg.fallbackModel;
     this.thinkingLevel = cfg.thinkingLevel ?? 'low';
   }
 
   async generate(req: ModelRequest): Promise<ModelTurn> {
     try {
-      return await this.once(req);
+      return await this.attempt(req, this.name, !this.fallbackModel);
+    } catch (e) {
+      // model utama penuh (5xx), terlalu lama, atau kuotanya habis: pindah ke model cadangan bila ada (D-44)
+      if (!this.fallbackModel || !(e instanceof ModelError) || req.signal?.aborted || !['unavailable', 'timeout', 'quota'].includes(e.reason)) throw e;
+      console.warn(`[agent] ${this.name} gagal (${e.reason}), pindah ke model cadangan ${this.fallbackModel}`);
+      return this.attempt(req, this.fallbackModel, true);
+    }
+  }
+
+  /** Satu model: kirim ulang tanpa thinkingLevel bila ditolak, dan (bila diizinkan) coba ulang sekali saat 500/502/503. */
+  private async attempt(req: ModelRequest, model: string, retry5xx: boolean): Promise<ModelTurn> {
+    try {
+      return await this.once(req, model);
     } catch (e) {
       if (!(e instanceof ModelError) || req.signal?.aborted) throw e;
-      // model tidak mengenal thinkingLevel: ingat, lalu kirim ulang tanpa pengaturan itu
-      if (e.reason === 'rejected' && this.usesThinkingLevel() && /^\S+ 400 /.test(e.detail) && /thinking/i.test(e.detail)) {
-        noThinkingLevel.add(this.name);
-        return this.once(req);
+      if (e.reason === 'rejected' && this.usesThinkingLevel(model) && /^\S+ 400 /.test(e.detail) && /thinking/i.test(e.detail)) {
+        noThinkingLevel.add(model);
+        return this.once(req, model);
       }
-      // 500/502/503 biasanya sementara: coba sekali lagi. 504 berarti batas waktu habis, mengulang hanya membuang waktu.
-      if (e.reason === 'unavailable' && /^\S+ 50[023] /.test(e.detail)) {
+      // 504 berarti batas waktu habis, mengulang hanya membuang waktu
+      if (retry5xx && e.reason === 'unavailable' && /^\S+ 50[023] /.test(e.detail)) {
         await new Promise((r) => setTimeout(r, 800));
-        return this.once(req);
+        return this.once(req, model);
       }
       throw e;
     }
   }
 
-  private usesThinkingLevel(): boolean {
-    return this.thinkingLevel !== 'off' && !noThinkingLevel.has(this.name);
+  private usesThinkingLevel(model: string): boolean {
+    return this.thinkingLevel !== 'off' && !noThinkingLevel.has(model);
   }
 
-  private async once(req: ModelRequest): Promise<ModelTurn> {
+  private async once(req: ModelRequest, model: string): Promise<ModelTurn> {
     try {
       const res = await this.ai.models.generateContent({
-        model: this.name,
+        model,
         contents: req.contents,
         config: {
           systemInstruction: req.system,
@@ -86,7 +104,7 @@ export class GeminiModel implements AgentModel {
           temperature: 0.2,
           abortSignal: req.signal,
           automaticFunctionCalling: { disable: true },
-          ...(this.usesThinkingLevel() ? { thinkingConfig: { thinkingLevel: this.thinkingLevel.toUpperCase() as GenaiThinkingLevel } } : {}),
+          ...(this.usesThinkingLevel(model) ? { thinkingConfig: { thinkingLevel: this.thinkingLevel.toUpperCase() as GenaiThinkingLevel } } : {}),
         },
       });
       // Konten model dikembalikan utuh (termasuk thoughtSignature) agar riwayat sah untuk giliran berikutnya.
@@ -94,6 +112,7 @@ export class GeminiModel implements AgentModel {
       const parts = content.parts ?? [];
       const functionCalls = parts.filter((p) => p.functionCall?.name).map((p) => ({ id: p.functionCall!.id, name: p.functionCall!.name!, args: p.functionCall!.args ?? {} }));
       const text = parts.filter((p) => p.text && !p.thought).map((p) => p.text).join('').trim();
+      this.lastServedBy = model;
       return { content: { role: 'model', parts }, functionCalls, text };
     } catch (e) {
       const err = e as Error & { status?: number; cause?: { code?: string; message?: string } };

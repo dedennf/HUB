@@ -93,3 +93,29 @@ describe('tingkat berpikir', () => {
     expect(readThinkingLevel('tinggi')).toBe('low');
   });
 });
+
+describe('model cadangan', () => {
+  const withFallback = (model: string, fallbackModel: string) => new GeminiModel({ apiKey: 'k', model, fallbackModel, baseUrl: base });
+  const req = { system: 's', contents: [{ role: 'user' as const, parts: [{ text: 'hi' }] }], tools: [] };
+  it('503 di model utama: langsung pindah ke cadangan tanpa coba ulang utama', async () => {
+    const m = withFallback('s503', 'cadangan1');
+    const before = hits.get('s503') ?? 0;
+    expect((await m.generate(req)).text).toBe('halo');
+    expect(hits.get('s503')).toBe(before + 1);
+    expect(m.lastServedBy).toBe('cadangan1');
+  });
+  it('kuota habis dan 504 juga pindah ke cadangan', async () => {
+    expect((await withFallback('s429', 'cadangan2').generate(req)).text).toBe('halo');
+    expect((await withFallback('s504', 'cadangan3').generate(req)).text).toBe('halo');
+  });
+  it('404 (nama model salah) tidak pindah ke cadangan', async () => {
+    const e = await withFallback('s404', 'cadangan4').generate(req).catch((x) => x);
+    expect(e.reason).toBe('rejected');
+    expect(hits.get('cadangan4')).toBeUndefined();
+  });
+  it('cadangan juga gagal: galat cadangan diteruskan', async () => {
+    const e = await withFallback('s503', 's500').generate(req).catch((x) => x);
+    expect(e.reason).toBe('unavailable');
+    expect(e.detail).toMatch(/^ApiError 500 /);
+  });
+});
