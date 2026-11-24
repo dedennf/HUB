@@ -3,6 +3,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, us
 import { ApiFailure, confirmActions, sendVoiceToRa } from '@/lib/agent/client';
 import { SILENCE_RMS, toGeminiAudio, VoiceRecorder } from '@/lib/voice/recorder';
 import type { CardView, Lookups } from '@/lib/agent/cards';
+import type { EnglishFeedback } from '@/lib/agent/service';
+import { setEnglishMode as saveEnglishMode } from '@/app/(dashboard)/bahasa/actions';
 import { createLocalFlag } from '@/lib/local-flag';
 import { ACCEPT_GALLERY, prepareReceipt, uploadReceipt, type PreparedReceipt } from '@/lib/receipts/client';
 import type { ReceiptResult } from '@/lib/receipts/service';
@@ -15,7 +17,7 @@ export type RaMessage =
   | { id: string; from: 'user'; text: string; images?: (string | null)[]; voiceSeconds?: number }
   | {
     id: string; from: 'ra'; text: string; lines?: string[]; links?: RaLink[]; offline?: string | null;
-    actions?: CardView[]; lookups?: Lookups; edits?: CardEdits;
+    actions?: CardView[]; lookups?: Lookups; edits?: CardEdits; englishFeedback?: EnglishFeedback | null;
     status?: 'pending' | 'approved' | 'cancelled' | 'undone';
   };
 /** Ubahan chip per aksi: field → nilai baru (id atau tanggal) dan label tampilannya. */
@@ -38,6 +40,9 @@ type Ctx = {
   scanning: { preview: string | null; done: number; total: number } | null;
   /** Suara (Fase 5): mulai merekam, kirim, atau batal. */
   voice: VoiceState;
+  /** English Mode (SPEC 10.2.5): tersimpan di setelan, dibaca server saat memproses pesan. */
+  englishMode: boolean;
+  setEnglishMode: (on: boolean) => void;
   startVoice: () => void;
   stopVoice: (send: boolean) => void;
 };
@@ -48,7 +53,12 @@ const RaContext = createContext<Ctx | null>(null);
  * Status Ra: sheet di HP, panel kanan di laptop. Ctrl+K / Cmd+K membuka Ra dan memfokuskan inputnya.
  * Percakapan (pesan dan id percakapan di server) disimpan di sini supaya sama di panel dan sheet.
  */
-export function RaProvider({ children }: { children: ReactNode }) {
+export function RaProvider({ children, englishMode: initialEnglish = false }: { children: ReactNode; englishMode?: boolean }) {
+  const [englishMode, setEnglish] = useState(initialEnglish);
+  const setEnglishMode = useCallback((on: boolean) => {
+    setEnglish(on);
+    void saveEnglishMode(on).catch(() => setEnglish(!on));
+  }, []);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [messages, setMessages] = useState<RaMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -217,7 +227,7 @@ export function RaProvider({ children }: { children: ReactNode }) {
   }, [openRa]);
 
   return (
-    <RaContext value={{ messages, setMessages, conversationId, setConversationId, pickReceipts, addReceipts: (f) => void addReceipts(f), scanning, voice, startVoice: () => void startVoice(), stopVoice: (send) => void stopVoice(send), sheetOpen, openRa, closeSheet: () => setSheetOpen(false), panelCollapsed, setPanelCollapsed, inputRef }}>
+    <RaContext value={{ messages, setMessages, conversationId, setConversationId, pickReceipts, addReceipts: (f) => void addReceipts(f), scanning, voice, englishMode, setEnglishMode, startVoice: () => void startVoice(), stopVoice: (send) => void stopVoice(send), sheetOpen, openRa, closeSheet: () => setSheetOpen(false), panelCollapsed, setPanelCollapsed, inputRef }}>
       {children}
       {/* Pemilih struk (SPEC 7.2): kamera langsung, dan galeri/berkas tanpa atribut capture. */}
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true"

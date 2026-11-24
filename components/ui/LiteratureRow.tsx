@@ -9,7 +9,7 @@ const STATUS: Record<string, { label: string; tone: ChipTone }> = {
 };
 
 /** Judul, penulis · tahun, chip status verifikasi. */
-export function LiteratureRow({ title, authors, year, doi, status, href }: { title: string; authors: string | null; year: number | null; doi: string | null; status: string; href?: string }) {
+export function LiteratureRow({ title, authors, year, doi, status, href, readHref }: { title: string; authors: string | null; year: number | null; doi: string | null; status: string; href?: string; readHref?: string }) {
   const s = STATUS[status] ?? STATUS.unchecked;
   return (
     <div className="px-4 py-3">
@@ -18,6 +18,7 @@ export function LiteratureRow({ title, authors, year, doi, status, href }: { tit
         <p className="min-w-0 truncate text-[12px] text-muted">
           {[authors, year].filter(Boolean).join(' · ') || 'Penulis belum diisi'}
           {doi && <> · <a href={`https://doi.org/${encodeURI(doi)}`} target="_blank" rel="noopener noreferrer" className="text-accent underline">DOI</a></>}
+          {readHref && <> · <Link href={readHref} className="font-semibold text-accent underline">Baca dengan Ra</Link></>}
         </p>
         <Chip tone={s.tone}>{s.label}</Chip>
       </div>
