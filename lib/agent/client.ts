@@ -32,3 +32,11 @@ export type ConfirmResponse = { ok: boolean; message: string; executed: string[]
 export const confirmActions = (action_ids: string[], decision: 'approve' | 'reject', edits?: Record<string, Record<string, string>>) =>
   post<ConfirmResponse>('/api/agent/confirm', { action_ids, decision, edits });
 export const undoActions = (action_ids: string[]) => post<{ ok: boolean; message: string }>('/api/agent/undo', { action_ids });
+
+/** Pesan suara (SPEC 7.3): audio mentah ke /api/agent, Gemini yang mendengarkan. */
+export function sendVoiceToRa(audio: Blob, mime: string, conversationId: string | null): Promise<AgentResponse> {
+  const fd = new FormData();
+  fd.set('audio', new File([audio], mime === 'audio/wav' ? 'suara.wav' : 'suara', { type: mime }));
+  if (conversationId) fd.set('conversation_id', conversationId);
+  return post<AgentResponse>('/api/agent', fd, true);
+}

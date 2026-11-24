@@ -451,3 +451,18 @@ Rincian:
 - **Field meragukan**: keyakinan < 0,7 menandai nominal dan tanggal. Chip "Cek nominal" bisa diubah sebelum disetujui (`edits.amount`). Tanggal di masa depan atau lebih dari 400 hari lalu dianggap salah baca dan diganti waktu sekarang.
 - **Batas laju**: 20 struk per menit. Satu permintaan satu struk. Banyak struk diunggah berurutan dan digabung menjadi satu pesan Ra dengan "Setujui semua".
 - Transaksi dari struk tercatat dengan `source = 'receipt'` dan `receipt_id`.
+
+---
+
+# Keputusan Fase 5 · Suara Tingkat 1
+
+## D-47 · Pesan suara ke Gemini
+**Status: Diputuskan**
+
+- **Format**: perekam memakai `MediaRecorder` (webm/opus di Chrome, mp4 di Safari). Sebelum dikirim, rekaman diurai dengan Web Audio lalu ditulis ulang sebagai WAV 16 kHz mono. Daftar format audio resmi Gemini memuat WAV, sedangkan webm tidak, dan mp4 dari Safari belum pasti. WAV 60 detik kira-kira 1,9 MB, masih di bawah batas body Vercel 4,5 MB. Ini bukan speech-to-text: audio tetap utuh dan Gemini yang mendengarkan (SPEC 7.3). Bila browser tidak bisa mengurai, rekaman asli dikirim.
+- **Interaksi**: tahan tombol mic untuk bicara, lepas untuk kirim, geser ke kiri lebih dari 80 px untuk batal. Ketukan singkat memulai mode ketuk: rekaman berjalan sampai tombol mic diketuk lagi atau tombol Kirim ditekan. Batas 60 detik, lalu terkirim otomatis. Keyboard: Enter atau Spasi pada tombol mic. Saat kolom teks berisi, tombol bulat menjadi tombol kirim teks.
+- **Transkrip**: audio dikirim sebagai `inlineData` di giliran pengguna, dan konteks sistem diberi aturan PESAN SUARA. Gemini wajib mengawali jawaban teks terakhirnya dengan baris "Transkrip: ...". Server memisahkan baris itu dari balasan, lalu menampilkannya di gelembung pesan suara. Ini menghemat satu panggilan transkripsi terpisah.
+- **Privasi dan riwayat**: audio tidak disimpan di mana pun. Di `agent_messages`, giliran pengguna disimpan sebagai teks `[pesan suara] <transkrip>`, jadi percakapan lanjutan tidak mengirim ulang audio. Percakapan baru dari suara memakai `channel = 'voice'`.
+- **Saat Gemini tidak tersedia**: pengurai lokal tidak bisa mendengar. Ra menjawab dengan banner offline dan meminta pengguna mengetik. Tidak ada usulan yang dibuat.
+- **Dikte bawaan browser** (opsi di SPEC 7.3) tidak ditambahkan. Keyboard HP sudah punya tombol dikte sendiri.
+- **Belum teruji di perangkat asli**: Safari iPhone dan Chrome Android. Uji otomatis memakai Chromium dengan mikrofon palsu di ukuran laptop dan HP.

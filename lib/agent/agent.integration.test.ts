@@ -212,6 +212,37 @@ describe.skipIf(!run)('loop agen dengan model palsu', () => {
     expect(r.lines?.length).toBeGreaterThan(0);
   });
 
+  it('pesan suara: audio dikirim mentah ke Gemini, satu rekaman jadi beberapa aksi, transkrip disimpan tanpa audio', async () => {
+    const wav = Buffer.from('RIFF....WAVEfmt uji-suara');
+    const model = new FakeModel((req, step) => {
+      if (step === 0) return { calls: [
+        { name: 'add_transaction', args: { kind: 'expense', amount: 30000, account: 'gopay', note: 'bensin' } },
+        { name: 'add_transaction', args: { kind: 'expense', amount: 25000, account: 'cash', note: 'makan siang', category: 'Makan' } },
+      ] };
+      return { text: 'Transkrip: tadi beli bensin tiga puluh ribu pakai gopay terus makan siang dua lima ribu cash\nOke, ada 2 pengeluaran. Cek dulu ya.' };
+    });
+    const r = await handleMessage(ctx(), model, '', null, { audio: { data: wav, mime: 'audio/wav' } });
+    const first = model.requests[0];
+    const audioPart = first.contents.at(-1)!.parts!.find((p) => p.inlineData);
+    expect(audioPart?.inlineData).toEqual({ mimeType: 'audio/wav', data: wav.toString('base64') });
+    expect(first.system).toMatch(/PESAN SUARA/);
+    expect(r.proposed_actions).toHaveLength(2);
+    expect(r.transcript).toBe('tadi beli bensin tiga puluh ribu pakai gopay terus makan siang dua lima ribu cash');
+    expect(r.reply).toBe('Oke, ada 2 pengeluaran. Cek dulu ya.');
+    const { data: conv } = await db.from('agent_conversations').select('channel').eq('id', r.conversation_id).single();
+    expect(conv!.channel).toBe('voice');
+    const { data: msgs } = await db.from('agent_messages').select('role,content').eq('conversation_id', r.conversation_id).order('created_at');
+    expect(JSON.stringify(msgs)).not.toContain(wav.toString('base64'));
+    expect((msgs![0].content as { parts: { text: string }[] }).parts[0].text).toBe('[pesan suara] tadi beli bensin tiga puluh ribu pakai gopay terus makan siang dua lima ribu cash');
+    await rejectActions(ctx(), r.proposed_actions.map((a) => a.id));
+  });
+
+  it('pesan suara saat Gemini tidak tersedia: tidak ada usulan, diminta mengetik', async () => {
+    const r = await handleMessage(ctx(), null, '', null, { audio: { data: Buffer.from('x'), mime: 'audio/wav' } });
+    expect(r).toMatchObject({ proposed_actions: [], transcript: null, offline: 'Gemini belum diatur' });
+    expect(r.reply).toMatch(/Ketik perintahnya/);
+  });
+
   it('batas laju 30 pesan per menit', async () => {
     const { data: conv } = await db.from('agent_conversations').insert({ channel: 'text' }).select('id').single();
     await db.from('agent_messages').insert(Array.from({ length: 30 }, () => ({ conversation_id: conv!.id, role: 'user', content: { role: 'user', parts: [{ text: 'x' }] } })));

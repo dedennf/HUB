@@ -791,11 +791,11 @@ Setiap fase selesai jika semua kriteria terpenuhi, build lolos, dan preview Verc
 - [x] Ekstraksi terstruktur, deteksi bukti transfer, penanda field meragukan (chip nominal bisa dikoreksi)
 - [x] Merchant rule dari memori dipakai untuk kategori
 
-**Fase 5 · Suara Tingkat 1**
-- [ ] Rekaman audio dikirim langsung ke Gemini, bukan teks
-- [ ] Satu rekaman bisa menghasilkan beberapa aksi
-- [ ] Transkrip tampil di riwayat
-- [ ] Berjalan di Chrome Android, Safari iPhone, dan browser laptop
+**Fase 5 · Suara Tingkat 1** (D-47)
+- [x] Rekaman audio dikirim langsung ke Gemini, bukan teks (WAV 16 kHz mono, tanpa speech-to-text di klien)
+- [x] Satu rekaman bisa menghasilkan beberapa aksi
+- [x] Transkrip tampil di riwayat (gelembung pesan suara dan `agent_messages`)
+- [ ] Berjalan di Chrome Android, Safari iPhone, dan browser laptop (diuji otomatis di Chromium laptop dan HP. Safari iPhone dan Chrome Android menunggu uji pemilik di perangkat asli)
 
 **Fase 6 · Otomasi + Notifikasi**
 - [ ] PWA, service worker, push subscription multi perangkat

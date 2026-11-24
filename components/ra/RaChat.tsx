@@ -11,6 +11,7 @@ import { ProposalCard } from './ProposalCard';
 import { RaInputBar } from './RaInputBar';
 import { RaAvatar } from './RaMark';
 import { ReceiptScanning } from './ReceiptScanning';
+import { RecordingView } from './RecordingView';
 import { UndoToast } from './UndoToast';
 
 const EXAMPLES = ['tadi beli bensin 30rb pakai gopay', 'tugas laporan RDTR dikumpul jumat jam 23.59', 'pindahin 500rb dari BCA ke Dana', 'sisa uang di semua akun berapa'];
@@ -20,7 +21,7 @@ type RaMsg = Extract<RaMessage, { from: 'ra' }>;
 
 /** Percakapan Ra (SPEC 6.2 dan 6.3). Dipakai panel laptop dan sheet HP. */
 export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<HTMLInputElement | null>; showCamera?: boolean }) {
-  const { messages, setMessages, conversationId, setConversationId, pickReceipts, scanning } = useRa();
+  const { messages, setMessages, conversationId, setConversationId, pickReceipts, scanning, voice, startVoice, stopVoice } = useRa();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [toast, setToast] = useState<{ text: string; ids: string[]; msgId: string } | null>(null);
@@ -84,7 +85,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
           <div className="flex flex-col items-center gap-3 px-2 py-6 text-center">
             <RaAvatar size={44} />
             <p className="font-display text-[16px] font-bold">Catat apa hari ini?</p>
-            <p className="max-w-72 text-[13px] text-muted">Tulis seperti chat biasa, atau kirim foto struk dan bukti transfer. Tidak ada yang tersimpan sebelum kamu setujui.</p>
+            <p className="max-w-72 text-[13px] text-muted">Tulis atau bicara seperti chat biasa, atau kirim foto struk. Tahan tombol mic untuk bicara. Tidak ada yang tersimpan sebelum kamu setujui.</p>
             <div className="flex flex-wrap justify-center gap-2">
               {EXAMPLES.map((e) => (
                 <button key={e} type="button" onClick={() => send(e)} className="min-h-11 rounded-xl border border-line bg-surface px-3 text-[12px] text-fg hover:border-accent">{e}</button>
@@ -103,7 +104,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
                       : <span key={i} className="flex h-20 w-16 items-center justify-center rounded-xl border border-line bg-surface text-[11px] font-semibold text-muted">PDF/HEIC</span>)}
                   </div>
                 )}
-                <ChatBubble from="user">{m.text}</ChatBubble>
+                <ChatBubble from="user" voiceSeconds={m.voiceSeconds}>{m.text}</ChatBubble>
               </div>
             ) : (
               <div key={m.id} className="flex flex-col gap-2.5">
@@ -132,6 +133,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
               </div>
             ))}
             {pending && <p className="text-[13px] text-muted" role="status">Ra membaca...</p>}
+            {voice.state === 'sending' && <p className="text-[13px] text-muted" role="status">Ra mendengarkan rekamanmu...</p>}
             {scanning && (
               <div>
                 <ReceiptScanning imageUrl={scanning.preview ?? undefined} />
@@ -142,7 +144,17 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
           </div>
         )}
       </div>
-      <RaInputBar inputRef={inputRef} onSubmit={send} busy={pending} showCamera={showCamera} onPick={pickReceipts} picking={!!scanning} />
+      {voice.state === 'recording' && (
+        <div className="card mb-3">
+          <RecordingView seconds={voice.seconds} levels={voice.levels.length ? voice.levels : Array(16).fill(0.1)} />
+          <div className="grid grid-cols-2 gap-3 px-4 pb-4">
+            <button type="button" className="btn" onClick={() => stopVoice(false)}>Batal</button>
+            <button type="button" className="btn btn-primary" onClick={() => stopVoice(true)}>Kirim</button>
+          </div>
+        </div>
+      )}
+      <RaInputBar inputRef={inputRef} onSubmit={send} busy={pending} showCamera={showCamera} onPick={pickReceipts} picking={!!scanning}
+        voice={{ recording: voice.state === 'recording', sending: voice.state === 'sending', start: startVoice, stop: stopVoice }} />
       {toast && (
         <UndoToast key={toast.msgId} message={toast.text} undoing={undoing} onDone={() => setToast(null)}
           onUndo={async () => {
