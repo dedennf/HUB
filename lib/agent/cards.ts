@@ -7,12 +7,15 @@ export type Lookups = {
   categories: { id: string; name: string; kind: 'expense' | 'income' }[];
   courses: { id: string; name: string }[];
 };
-export type ChipEdit = 'account' | 'category_expense' | 'category_income' | 'course' | 'date' | 'datetime';
+export type ChipEdit = 'account' | 'category_expense' | 'category_income' | 'course' | 'date' | 'datetime' | 'amount';
 export type CardChip = { label: string; doubtful?: boolean; field?: string; edit?: ChipEdit; value?: string };
 export type CardIcon = 'expense' | 'income' | 'transfer' | 'task' | 'event' | 'idea' | 'need' | 'vocab' | 'delete' | 'other';
 export type CardView = {
   id: string; tool: string; icon: CardIcon; kindLabel: string; value: string; chips: CardChip[];
-  note?: string; /** true bila catatan berisi peringatan atau tebakan, bukan sekadar info */ warn?: boolean; destructive: boolean; status: 'proposed' | 'executed' | 'rejected' | 'undone' | 'failed';
+  note?: string; /** true bila catatan berisi peringatan atau tebakan, bukan sekadar info */ warn?: boolean; destructive: boolean;
+  /** Struk sumber (Fase 4): signed URL berumur pendek dan jenis berkasnya. */
+  receipt_url?: string; receipt_mime?: string;
+  status: 'proposed' | 'executed' | 'rejected' | 'undone' | 'failed';
 };
 export type ActionRow = {
   id: string; tool_name: string; summary: string; permission: 'write' | 'destructive'; status: CardView['status'];
@@ -31,6 +34,11 @@ const TASK_KIND: Record<string, string> = { assignment: 'Tugas baru', exam: 'Uji
 
 const rp = (n: unknown) => `Rp${Math.round(Number(n) || 0).toLocaleString('id-ID')}`;
 const str = (v: unknown) => (typeof v === 'string' ? v : null);
+
+/** Chip nominal hanya muncul bila nominal meragukan (struk buram), supaya bisa diperbaiki sebelum disetujui. */
+function amountChip(amount: unknown, doubt: Set<string>): CardChip[] {
+  return doubt.has('amount') ? [{ label: `Cek nominal`, doubtful: true, field: 'amount', edit: 'amount', value: String(Math.round(Number(amount) || 0)) }] : [];
+}
 
 function dayLabel(iso: string | null, today: string, withTime: boolean): string {
   if (!iso) return 'Tanpa tanggal';
@@ -56,7 +64,8 @@ export function cardFor(row: ActionRow, lk: Lookups, today: string): CardView {
         chips: [
           { label: name(lk.categories, r.category_id, 'Tanpa kategori'), doubtful: doubt.has('category'), field: 'category', edit: kind === 'income' ? 'category_income' : 'category_expense', value: str(r.category_id) ?? '' },
           { label: name(lk.accounts, r.account_id, 'Pilih akun'), doubtful: doubt.has('account'), field: 'account', edit: 'account', value: str(r.account_id) ?? '' },
-          { label: dayLabel(occurred, today, false), field: 'occurred_at', edit: 'date', value: occurred ? zonedParts(occurred).date : today },
+          { label: dayLabel(occurred, today, false), doubtful: doubt.has('date'), field: 'occurred_at', edit: 'date', value: occurred ? zonedParts(occurred).date : today },
+          ...amountChip(r.amount, doubt),
         ],
         note: [str(r.merchant) ?? str(r.note) ? `Catatan: ${str(r.merchant) ?? str(r.note)}.` : '', base.note ?? ''].filter(Boolean).join(' ') || undefined,
       };
@@ -68,7 +77,8 @@ export function cardFor(row: ActionRow, lk: Lookups, today: string): CardView {
         chips: [
           { label: name(lk.accounts, r.from, 'Akun asal'), field: 'from_account', edit: 'account', value: str(r.from) ?? '' },
           { label: `ke ${name(lk.accounts, r.to, 'akun tujuan')}`, field: 'to_account', edit: 'account', value: str(r.to) ?? '' },
-          { label: dayLabel(occurred, today, false), field: 'occurred_at', edit: 'date', value: occurred ? zonedParts(occurred).date : today },
+          { label: dayLabel(occurred, today, false), doubtful: doubt.has('date'), field: 'occurred_at', edit: 'date', value: occurred ? zonedParts(occurred).date : today },
+          ...amountChip(r.amount, doubt),
         ],
         note: Number(r.fee) > 0 ? `Biaya admin ${rp(r.fee)} dicatat sebagai pengeluaran terpisah.` : base.note,
       };
