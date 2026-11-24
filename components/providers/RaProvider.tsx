@@ -43,6 +43,9 @@ type Ctx = {
   /** English Mode (SPEC 10.2.5): tersimpan di setelan, dibaca server saat memproses pesan. */
   englishMode: boolean;
   setEnglishMode: (on: boolean) => void;
+  /** Percakapan suara langsung (Fase 8) menggantikan tampilan chat selama berlangsung. */
+  liveOpen: boolean;
+  setLiveOpen: (v: boolean) => void;
   startVoice: () => void;
   stopVoice: (send: boolean) => void;
 };
@@ -55,6 +58,7 @@ const RaContext = createContext<Ctx | null>(null);
  */
 export function RaProvider({ children, englishMode: initialEnglish = false }: { children: ReactNode; englishMode?: boolean }) {
   const [englishMode, setEnglish] = useState(initialEnglish);
+  const [liveOpen, setLiveOpen] = useState(false);
   const setEnglishMode = useCallback((on: boolean) => {
     setEnglish(on);
     void saveEnglishMode(on).catch(() => setEnglish(!on));
@@ -227,7 +231,7 @@ export function RaProvider({ children, englishMode: initialEnglish = false }: { 
   }, [openRa]);
 
   return (
-    <RaContext value={{ messages, setMessages, conversationId, setConversationId, pickReceipts, addReceipts: (f) => void addReceipts(f), scanning, voice, englishMode, setEnglishMode, startVoice: () => void startVoice(), stopVoice: (send) => void stopVoice(send), sheetOpen, openRa, closeSheet: () => setSheetOpen(false), panelCollapsed, setPanelCollapsed, inputRef }}>
+    <RaContext value={{ messages, setMessages, conversationId, setConversationId, pickReceipts, addReceipts: (f) => void addReceipts(f), scanning, voice, englishMode, setEnglishMode, liveOpen, setLiveOpen, startVoice: () => void startVoice(), stopVoice: (send) => void stopVoice(send), sheetOpen, openRa, closeSheet: () => setSheetOpen(false), panelCollapsed, setPanelCollapsed, inputRef }}>
       {children}
       {/* Pemilih struk (SPEC 7.2): kamera langsung, dan galeri/berkas tanpa atribut capture. */}
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true"

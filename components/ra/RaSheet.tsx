@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useRa } from '@/components/providers/RaProvider';
 import { EnglishModeSwitch } from './EnglishModeSwitch';
+import { LiveButton } from './LiveButton';
 import { RaChat } from './RaChat';
 import { RaAvatar } from './RaMark';
 
@@ -35,6 +36,7 @@ export function RaSheet() {
           </span>
           <span className="flex items-center gap-1">
             <EnglishModeSwitch />
+          <LiveButton />
             <button type="button" onClick={closeSheet} className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted" aria-label="Tutup Ra">
               <X size={20} strokeWidth={1.8} aria-hidden="true" />
             </button>
