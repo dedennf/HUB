@@ -1,6 +1,7 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
-import { ApiFailure, confirmActions } from '@/lib/agent/client';
+import { ApiFailure, confirmActions, sendVoiceToRa } from '@/lib/agent/client';
+import { toGeminiAudio, VoiceRecorder } from '@/lib/voice/recorder';
 import type { CardView, Lookups } from '@/lib/agent/cards';
 import { createLocalFlag } from '@/lib/local-flag';
 import { ACCEPT_GALLERY, prepareReceipt, uploadReceipt, type PreparedReceipt } from '@/lib/receipts/client';
@@ -11,7 +12,7 @@ const DESKTOP = '(min-width: 64rem)';
 
 export type RaLink = { label: string; href: string };
 export type RaMessage =
-  | { id: string; from: 'user'; text: string; images?: (string | null)[] }
+  | { id: string; from: 'user'; text: string; images?: (string | null)[]; voiceSeconds?: number }
   | {
     id: string; from: 'ra'; text: string; lines?: string[]; links?: RaLink[]; offline?: string | null;
     actions?: CardView[]; lookups?: Lookups; edits?: CardEdits;
@@ -35,7 +36,12 @@ type Ctx = {
   pickReceipts: (mode: 'camera' | 'gallery') => void;
   addReceipts: (files: File[]) => void;
   scanning: { preview: string | null; done: number; total: number } | null;
+  /** Suara (Fase 5): mulai merekam, kirim, atau batal. */
+  voice: VoiceState;
+  startVoice: () => void;
+  stopVoice: (send: boolean) => void;
 };
+export type VoiceState = { state: 'idle' | 'recording' | 'sending'; seconds: number; levels: number[] };
 const RaContext = createContext<Ctx | null>(null);
 
 /**
@@ -117,6 +123,67 @@ export function RaProvider({ children }: { children: ReactNode }) {
     }]);
   }, [openRa]);
 
+  const [voice, setVoice] = useState<VoiceState>({ state: 'idle', seconds: 0, levels: [] });
+  const recRef = useRef<VoiceRecorder | null>(null);
+  const sayRa = useCallback((text: string, extra: Partial<Extract<RaMessage, { from: 'ra' }>> = {}) =>
+    setMessages((m) => [...m, { id: Math.random().toString(36).slice(2), from: 'ra', text, ...extra }]), []);
+
+  const stopVoice = useCallback(async (send: boolean) => {
+    const rec = recRef.current;
+    if (!rec) return;
+    recRef.current = null;
+    if (!send) { rec.cancel(); setVoice({ state: 'idle', seconds: 0, levels: [] }); return; }
+    setVoice((v) => ({ ...v, state: 'sending' }));
+    const out = await rec.stop();
+    if (!out || out.seconds < 1) {
+      setVoice({ state: 'idle', seconds: 0, levels: [] });
+      sayRa('Rekamannya terlalu pendek. Tahan tombol mic sambil bicara, atau ketuk sekali untuk mulai dan ketuk lagi untuk kirim.');
+      return;
+    }
+    const msgId = Math.random().toString(36).slice(2);
+    setMessages((m) => {
+      const stale = m.flatMap((x) => (x.from === 'ra' && x.status === 'pending' ? (x.actions ?? []).map((a) => a.id) : []));
+      if (stale.length) void confirmActions(stale, 'reject').catch(() => {});
+      return [...m.map((x) => (x.from === 'ra' && x.status === 'pending' ? { ...x, status: 'cancelled' as const } : x)),
+        { id: msgId, from: 'user', text: 'Mengirim pesan suara...', voiceSeconds: out.seconds }];
+    });
+    try {
+      const audio = await toGeminiAudio(out.blob);
+      const r = await sendVoiceToRa(audio.blob, audio.mime, convRef.current);
+      if (r.conversation_id) { convRef.current = r.conversation_id; setConversationId(r.conversation_id); }
+      // transkrip menggantikan teks gelembung pesan suara (SPEC 7.3: transkrip tampil di riwayat)
+      setMessages((m) => m.map((x) => (x.id === msgId && x.from === 'user' ? { ...x, text: r.transcript ? `“${r.transcript}”` : 'Pesan suara (tidak tertranskrip)' } : x)));
+      sayRa(r.reply, { actions: r.proposed_actions, lookups: r.lookups, offline: r.offline, edits: {}, status: r.proposed_actions.length ? 'pending' : undefined });
+    } catch (e) {
+      setMessages((m) => m.map((x) => (x.id === msgId && x.from === 'user' ? { ...x, text: 'Pesan suara (gagal terkirim)' } : x)));
+      sayRa(e instanceof ApiFailure ? e.message : 'Ra sedang tidak tersambung ke server. Coba lagi sebentar lagi.');
+    } finally {
+      setVoice({ state: 'idle', seconds: 0, levels: [] });
+    }
+  }, [sayRa]);
+
+  const startVoice = useCallback(async () => {
+    if (recRef.current) return;
+    openRa();
+    if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      sayRa('Browser ini belum bisa merekam suara. Coba Chrome, Safari terbaru, atau ketik perintahnya.');
+      return;
+    }
+    const rec = new VoiceRecorder((u) => setVoice((v) => (v.state === 'recording' ? { ...v, ...u } : v)), () => void stopVoice(true));
+    recRef.current = rec;
+    setVoice({ state: 'recording', seconds: 0, levels: [] });
+    try {
+      await rec.start();
+    } catch (e) {
+      recRef.current = null;
+      setVoice({ state: 'idle', seconds: 0, levels: [] });
+      const denied = (e as Error).name === 'NotAllowedError' || (e as Error).name === 'SecurityError';
+      sayRa(denied
+        ? 'Izin mikrofon ditolak. Izinkan mikrofon untuk Kompas di pengaturan browser, lalu coba lagi.'
+        : 'Mikrofon tidak bisa dipakai. Pastikan tidak sedang dipakai aplikasi lain.');
+    }
+  }, [openRa, sayRa, stopVoice]);
+
   const pickReceipts = useCallback((mode: 'camera' | 'gallery') => {
     (mode === 'camera' ? cameraRef : galleryRef).current?.click();
   }, []);
@@ -145,7 +212,7 @@ export function RaProvider({ children }: { children: ReactNode }) {
   }, [openRa]);
 
   return (
-    <RaContext value={{ messages, setMessages, conversationId, setConversationId, pickReceipts, addReceipts: (f) => void addReceipts(f), scanning, sheetOpen, openRa, closeSheet: () => setSheetOpen(false), panelCollapsed, setPanelCollapsed, inputRef }}>
+    <RaContext value={{ messages, setMessages, conversationId, setConversationId, pickReceipts, addReceipts: (f) => void addReceipts(f), scanning, voice, startVoice: () => void startVoice(), stopVoice: (send) => void stopVoice(send), sheetOpen, openRa, closeSheet: () => setSheetOpen(false), panelCollapsed, setPanelCollapsed, inputRef }}>
       {children}
       {/* Pemilih struk (SPEC 7.2): kamera langsung, dan galeri/berkas tanpa atribut capture. */}
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true"

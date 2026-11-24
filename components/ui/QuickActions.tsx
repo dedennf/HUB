@@ -10,14 +10,14 @@ function Icon({ icon: I }: { icon: LucideIcon }) {
   return <span className={box}><I size={22} strokeWidth={1.8} aria-hidden="true" /></span>;
 }
 
-/** Catat, Struk, Suara, Transfer. Struk langsung membuka pemilih foto (HP menawarkan kamera atau galeri). Suara menunggu Fase 5. */
+/** Catat, Struk, Suara, Transfer. Struk langsung membuka pemilih foto (HP menawarkan kamera atau galeri). Suara membuka Ra dan mulai merekam (ketuk Kirim untuk selesai). */
 export function QuickActions() {
-  const { openRa, pickReceipts } = useRa();
+  const { pickReceipts, startVoice } = useRa();
   return (
     <nav aria-label="Aksi cepat" className="grid grid-cols-4 gap-2">
       <Link href="/keuangan?tab=transaksi#catat" className={item}><Icon icon={Plus} />Catat</Link>
       <button type="button" onClick={() => pickReceipts('gallery')} className={item}><Icon icon={ReceiptText} />Struk</button>
-      <button type="button" onClick={openRa} className={item}><Icon icon={Mic} />Suara</button>
+      <button type="button" onClick={startVoice} className={item}><Icon icon={Mic} />Suara</button>
       <Link href="/keuangan?tab=transaksi&jenis=transfer#catat" className={item}><Icon icon={ArrowLeftRight} />Transfer</Link>
     </nav>
   );

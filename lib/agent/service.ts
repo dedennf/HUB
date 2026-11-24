@@ -11,6 +11,8 @@ export const RATE_LIMIT_PER_MIN = 30;
 export type AgentResponse = {
   conversation_id: string; reply: string; lines?: string[]; proposed_actions: CardView[]; lookups: Lookups;
   offline: string | null; english_feedback: null;
+  /** Pesan suara: apa yang didengar Ra (null bila tidak jelas). */
+  transcript?: string | null;
 };
 
 export async function loadLookups(db: SupabaseClient): Promise<Lookups> {
@@ -48,15 +50,20 @@ const OFFLINE_REASON: Record<ModelError['reason'], string> = {
   not_configured: 'Gemini belum diatur', quota: 'kuota habis', timeout: 'Gemini terlalu lama menjawab', rejected: 'permintaan ditolak Gemini', unavailable: 'Gemini tidak bisa dihubungi',
 };
 
-export async function handleMessage(ctx: ToolCtx, model: AgentModel | null, text: string, conversationId: string | null, opts: { maxSteps?: number; signal?: AbortSignal; budgetMs?: number } = {}): Promise<AgentResponse> {
+export async function handleMessage(ctx: ToolCtx, model: AgentModel | null, text: string, conversationId: string | null, opts: {
+  maxSteps?: number; signal?: AbortSignal; budgetMs?: number; audio?: { data: Buffer; mime: string };
+} = {}): Promise<AgentResponse> {
   const lookups = await loadLookups(ctx.db);
   let offline: string | null = model ? null : OFFLINE_REASON.not_configured;
   if (model) {
     const budget = AbortSignal.timeout(opts.budgetMs ?? AGENT_BUDGET_MS);
     const signal = opts.signal ? AbortSignal.any([opts.signal, budget]) : budget;
     try {
-      const r = await runAgent({ ctx, model, text, conversationId, maxSteps: opts.maxSteps, signal });
-      return { conversation_id: r.conversation_id, reply: r.reply, proposed_actions: await loadCards(ctx.db, r.action_ids, lookups, ctx.today), lookups, offline: null, english_feedback: null };
+      const r = await runAgent({ ctx, model, text, conversationId, maxSteps: opts.maxSteps, signal, audio: opts.audio });
+      return {
+        conversation_id: r.conversation_id, reply: r.reply, proposed_actions: await loadCards(ctx.db, r.action_ids, lookups, ctx.today), lookups, offline: null, english_feedback: null,
+        ...(opts.audio ? { transcript: r.transcript ?? null } : {}),
+      };
     } catch (e) {
       if (opts.signal?.aborted) throw e;
       if (e instanceof ModelError) {
@@ -70,6 +77,13 @@ export async function handleMessage(ctx: ToolCtx, model: AgentModel | null, text
       // usulan yang sempat dibuat sebelum model gagal tidak ditampilkan, jadi ditolak supaya tidak menggantung
       await ctx.db.from('agent_actions').update({ status: 'rejected' }).eq('status', 'proposed').gte('created_at', ctx.now.toISOString());
     }
+  }
+  if (opts.audio) {
+    // pengurai lokal tidak bisa mendengar: minta pengguna mengetik (SPEC 12, opsi isi manual)
+    return {
+      conversation_id: conversationId ?? '', reply: 'Pesan suara belum bisa diproses. Ketik perintahnya, pengurai lokal tetap bisa membantu.',
+      proposed_actions: [], lookups, offline, english_feedback: null, transcript: null,
+    };
   }
   const convId = await ensureConversation(ctx.db, conversationId, 'text', text);
   const r = await runFallback(ctx, text, convId);
