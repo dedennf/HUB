@@ -424,3 +424,8 @@ Production membalas `503` dua kali berturut-turut untuk `gemini-3.8-flash` (mode
 - Galat 400, 403, dan 404 (kunci atau nama model salah) tidak dialihkan, supaya salah konfigurasi tetap kelihatan.
 - Tanpa model cadangan, perilaku lama berlaku: coba ulang sekali untuk 500, 502, dan 503.
 - Pengalihan dicatat di log `[agent] ... pindah ke model cadangan`.
+
+## D-45 · Halaman diagnosa Gemini
+**Status: Diputuskan**
+
+Masalah koneksi Gemini di production sulit dibedakan dari log saja (model penuh, nama model, kuota, atau isi permintaan Ra). `GET /api/agent/diagnose` hanya untuk pemilik yang sedang login. Endpoint ini menguji model utama dan model cadangan secara paralel dengan pesan singkat, dengan dan tanpa 38 deklarasi tool, ditambah satu uji tanpa `thinkingLevel`. Hasilnya JSON berisi konfigurasi (tanpa API key), status, galat asli, dan lama tiap uji, dan juga dicatat di log Vercel. Satu kunjungan memakai paling banyak lima permintaan kecil ke Gemini.
