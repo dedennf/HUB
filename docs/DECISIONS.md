@@ -429,3 +429,25 @@ Production membalas `503` dua kali berturut-turut untuk `gemini-3.8-flash` (mode
 **Status: Diputuskan**
 
 Masalah koneksi Gemini di production sulit dibedakan dari log saja (model penuh, nama model, kuota, atau isi permintaan Ra). `GET /api/agent/diagnose` hanya untuk pemilik yang sedang login. Endpoint ini menguji model utama dan model cadangan secara paralel dengan pesan singkat, dengan dan tanpa 38 deklarasi tool, ditambah satu uji tanpa `thinkingLevel`. Hasilnya JSON berisi konfigurasi (tanpa API key), status, galat asli, dan lama tiap uji, dan juga dicatat di log Vercel. Satu kunjungan memakai paling banyak lima permintaan kecil ke Gemini.
+
+---
+
+# Keputusan Fase 4 · Struk
+
+## D-46 · Alur struk: ekstraksi satu kali, usulan dari registry
+**Status: Diputuskan**
+
+SPEC 7.2 meminta server "memanggil agen dengan gambar" lalu agen memanggil `read_receipt` dan mengusulkan transaksi. Di Kompas, `/api/receipts/upload` memanggil Gemini satu kali dengan output terstruktur (`responseMimeType: application/json` dan `responseJsonSchema` sesuai SPEC 7.2, ditambah `category_hint`), lalu server menyusun usulan secara pasti lewat registry tools (`add_transaction` atau `add_transfer`, prepare lalu agent_actions). Alasannya:
+- Satu panggilan Gemini per struk, bukan dua sampai tiga putaran loop agen. Lebih hemat kuota dan cepat (D-42 sampai D-45 menunjukkan kuota dan waktu itu sempit).
+- Aturan SPEC (bukti transfer antar akun sendiri → transfer, keyakinan < 0,7 → field kuning, merchant_rule dulu) berjalan pasti dan bisa diuji, tidak bergantung nalar model.
+- Kartu, konfirmasi, undo, dan Log Agen sama persis dengan input teks. `read_receipt` tetap ada untuk agen membaca hasil tersimpan.
+
+Rincian:
+- **Duplikat**: hash SHA-256 dihitung klien dari berkas asli sebelum dikompres, supaya foto atau screenshot yang sama selalu menghasilkan hash yang sama. Server menolak hash yang sudah ada dan menautkan ke transaksinya. Struk yang usulannya ditolak, di-undo, atau gagal dibaca boleh diunggah ulang: indeks unik `receipts_hash_uq` kini hanya untuk status selain `rejected` (migrasi 0015).
+- **Status struk**: `pending` saat dibaca, `confirmed` saat usulan disetujui, `rejected` saat ditolak, di-undo, atau total tak terbaca. Bila Gemini gagal, berkas dan barisnya dihapus.
+- **Penyimpanan**: bucket privat `receipts`, berkas di `<user_id>/<hash>.<ext>`, RLS Storage per folder pengguna. Gambar ditampilkan lewat signed URL 10 menit (kartu usulan dan halaman ubah transaksi).
+- **Ukuran**: foto dikompres di klien (sisi terpanjang 1600 px, JPEG 0,8). HEIC yang tidak bisa dibaca browser dikirim asli (Gemini membaca HEIC). Batas 4 MB per berkas karena batas body fungsi Vercel 4,5 MB, termasuk PDF.
+- **Akun dan kategori**: nama akun dan kategori pengguna dimasukkan ke prompt. `payment_method` atau akun asal yang cocok dengan akun pengguna dipakai sebagai akun. Bukti transfer ke pihak lain menjadi pengeluaran dari akun asal. Kategori: merchant_rule di memori, lalu `category_hint` dari Gemini.
+- **Field meragukan**: keyakinan < 0,7 menandai nominal dan tanggal. Chip "Cek nominal" bisa diubah sebelum disetujui (`edits.amount`). Tanggal di masa depan atau lebih dari 400 hari lalu dianggap salah baca dan diganti waktu sekarang.
+- **Batas laju**: 20 struk per menit. Satu permintaan satu struk. Banyak struk diunggah berurutan dan digabung menjadi satu pesan Ra dengan "Setujui semua".
+- Transaksi dari struk tercatat dengan `source = 'receipt'` dan `receipt_id`.

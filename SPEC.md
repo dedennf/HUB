@@ -785,11 +785,11 @@ Setiap fase selesai jika semua kriteria terpenuhi, build lolos, dan preview Verc
 - [x] Uji kalimat: "tadi beli bensin 30rb pakai gopay terus makan siang 25 ribu cash", "tugas laporan RDTR dikumpul jumat jam 23.59", "pindahin 500rb dari BCA ke Dana", "sisa uang di semua akun berapa" (model tiruan di `npm run test:it`, e2e dengan server Gemini tiruan)
 - [x] Koreksi pengguna tersimpan ke memori dan dipakai di permintaan berikutnya
 
-**Fase 4 · Struk**
-- [ ] Tombol kamera dan galeri terpisah, multi pilih, PDF, paste, drag and drop
-- [ ] Kompresi, hash, tolak duplikat
-- [ ] Ekstraksi terstruktur, deteksi bukti transfer, penanda field meragukan
-- [ ] Merchant rule dari memori dipakai untuk kategori
+**Fase 4 · Struk** (D-46)
+- [x] Tombol kamera dan galeri terpisah, multi pilih, PDF, paste, drag and drop (juga tombol cepat Struk di Beranda)
+- [x] Kompresi, hash, tolak duplikat (bucket privat `receipts`, signed URL 10 menit)
+- [x] Ekstraksi terstruktur, deteksi bukti transfer, penanda field meragukan (chip nominal bisa dikoreksi)
+- [x] Merchant rule dari memori dipakai untuk kategori
 
 **Fase 5 · Suara Tingkat 1**
 - [ ] Rekaman audio dikirim langsung ke Gemini, bukan teks
