@@ -17,7 +17,7 @@ export function normalize(s: string): string {
  * Cocokkan teks ke daftar item. Urutan: id persis, nama/alias persis, awalan, mengandung (dua arah),
  * lalu semua kata kueri muncul. Tingkat pertama yang menghasilkan kandidat dipakai.
  */
-export function matchName(query: string, items: Named[]): Resolution {
+export function matchName(query: string, items: Named[], opts: { exact?: boolean } = {}): Resolution {
   const q = normalize(query);
   if (!q) return { kind: 'not_found' };
   if (isUuid(query.trim())) {
@@ -31,7 +31,7 @@ export function matchName(query: string, items: Named[]): Resolution {
     (n) => n.includes(q) || (n.length >= 3 && q.includes(n)),
     (n) => q.split(' ').every((w) => n.split(' ').some((x) => x.startsWith(w))),
   ];
-  for (const test of tiers) {
+  for (const test of opts.exact ? tiers.slice(0, 1) : tiers) {
     const hits = items.filter((i) => names(i).some(test));
     if (hits.length === 1) return { kind: 'found', id: hits[0].id, label: hits[0].name };
     if (hits.length > 1) return { kind: 'ambiguous', candidates: hits.slice(0, 8).map((h) => ({ id: h.id, label: h.extra ? `${h.name} (${h.extra})` : h.name })) };
@@ -68,12 +68,13 @@ export async function resolveAccount(db: Db, name: string): Promise<Resolution> 
   return r;
 }
 
-export async function resolveCategory(db: Db, name: string, kind: 'expense' | 'income'): Promise<Resolution> {
+/** `exact`: hanya nama atau kata kunci yang sama persis, untuk menebak dari kata lepas di catatan. */
+export async function resolveCategory(db: Db, name: string, kind: 'expense' | 'income', opts: { exact?: boolean } = {}): Promise<Resolution> {
   const { data } = await db.from('categories').select('id,name,keywords,subcategories').eq('kind', kind).eq('is_hidden', false);
   const items: Named[] = (data ?? []).map((c) => ({ id: c.id, name: c.name, aliases: [...(c.keywords ?? []), ...(c.subcategories ?? [])] }));
   const fromMemory = await memoryAlias(db, name, 'category_id');
   if (fromMemory && items.some((i) => i.id === fromMemory)) return { kind: 'found', id: fromMemory, label: items.find((i) => i.id === fromMemory)!.name };
-  return matchName(name, items);
+  return matchName(name, items, opts);
 }
 
 export async function resolveCourse(db: Db, name: string): Promise<Resolution> {
@@ -83,6 +84,9 @@ export async function resolveCourse(db: Db, name: string): Promise<Resolution> {
   ]);
   const all = data ?? [];
   const toItem = (c: (typeof all)[number]): Named => ({ id: c.id, name: c.name, aliases: [c.alias, c.code].filter(Boolean) as string[] });
+  const fromMemory = await memoryAlias(db, name, 'course_id');
+  const learned = fromMemory ? all.find((c) => c.id === fromMemory) : undefined;
+  if (learned) return { kind: 'found', id: learned.id, label: learned.name };
   // utamakan mata kuliah semester aktif
   const active = all.filter((c) => c.semester_id && c.semester_id === sem?.id);
   const r = active.length ? matchName(name, active.map(toItem)) : { kind: 'not_found' as const };

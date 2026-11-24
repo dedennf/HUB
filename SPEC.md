@@ -779,11 +779,11 @@ Setiap fase selesai jika semua kriteria terpenuhi, build lolos, dan preview Verc
 - [x] Resolusi nama ke id (akun, mata kuliah, proyek, tugas, kategori, target, investasi, otomasi) termasuk alias dan memori, kandidat bila ambigu
 - [x] Update saldo otomatis dan konsisten saat tambah, ubah, hapus, undo (uji integrasi Supabase lokal, `npm run test:it`)
 
-**Fase 3 · Inti Agen + Input Teks**
-- [ ] Loop agen, konteks sistem, snapshot, memori
-- [ ] Usulan aksi, `ActionCard`, konfirmasi, undo, Log Agen
-- [ ] Uji kalimat: "tadi beli bensin 30rb pakai gopay terus makan siang 25 ribu cash", "tugas laporan RDTR dikumpul jumat jam 23.59", "pindahin 500rb dari BCA ke Dana", "sisa uang di semua akun berapa"
-- [ ] Koreksi pengguna tersimpan ke memori dan dipakai di permintaan berikutnya
+**Fase 3 · Inti Agen + Input Teks** (D-38 sampai D-41)
+- [x] Loop agen, konteks sistem, snapshot, memori (`lib/agent/core.ts`, cadangan pengurai lokal saat Gemini tidak tersedia)
+- [x] Usulan aksi, `ActionCard`, konfirmasi, undo, Log Agen (chip bisa diubah, aksi destruktif bertombol merah, `/pengaturan/log-agen`)
+- [x] Uji kalimat: "tadi beli bensin 30rb pakai gopay terus makan siang 25 ribu cash", "tugas laporan RDTR dikumpul jumat jam 23.59", "pindahin 500rb dari BCA ke Dana", "sisa uang di semua akun berapa" (model tiruan di `npm run test:it`, e2e dengan server Gemini tiruan)
+- [x] Koreksi pengguna tersimpan ke memori dan dipakai di permintaan berikutnya
 
 **Fase 4 · Struk**
 - [ ] Tombol kamera dan galeri terpisah, multi pilih, PDF, paste, drag and drop

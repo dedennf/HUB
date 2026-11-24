@@ -31,7 +31,7 @@ Baca seluruhnya sebelum mulai:
 - Typecheck: `npm run typecheck`
 - Unit test: `npm test`
 - Uji migrasi, RLS, dan saldo di PostgreSQL kosong: `PGURL=postgres://... npm run test:db`
-- Uji integrasi tools agen di Supabase lokal: `KOMPAS_IT_URL=http://127.0.0.1:54321 KOMPAS_IT_ANON=... KOMPAS_IT_SERVICE=... npm run test:it`
+- Uji integrasi tools dan loop agen (model tiruan) di Supabase lokal: `KOMPAS_IT_URL=http://127.0.0.1:54321 KOMPAS_IT_ANON=... KOMPAS_IT_SERVICE=... npm run test:it`
 - Migrasi ke Supabase: `npx supabase db push` (setelah `npx supabase link`)
 - Supabase lokal: `npx supabase start` (butuh Docker)
 - Migrasi baru: tambah file berurutan di `supabase/migrations/`, jangan ubah file yang sudah dijalankan di production.

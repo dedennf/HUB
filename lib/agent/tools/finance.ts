@@ -17,11 +17,21 @@ async function categoryNames(ctx: ToolCtx) {
 }
 
 /** Aturan merchant dari memori agen, mis. "Indomaret" → Kebutuhan harian. */
-async function merchantRule(ctx: ToolCtx, merchant: string): Promise<{ id: string; label: string } | null> {
-  const { data } = await ctx.db.from('agent_memory').select('key,value').eq('kind', 'merchant_rule');
-  const key = normalize(merchant);
-  const hit = (data ?? []).find((m) => normalize(String(m.key)) === key || key.includes(normalize(String(m.key))));
-  const id = hit?.value && typeof hit.value === 'object' ? String((hit.value as Record<string, unknown>).category_id ?? '') : '';
+/** Memori yang kuncinya muncul sebagai kata utuh di teks merchant atau catatan (SPEC 7.2, koreksi pengguna). */
+async function memoryFor(ctx: ToolCtx, kind: 'merchant_rule' | 'correction', field: string, texts: (string | null | undefined)[]): Promise<string | null> {
+  const hay = texts.filter(Boolean).map((t) => ` ${normalize(String(t))} `);
+  if (!hay.length) return null;
+  const { data } = await ctx.db.from('agent_memory').select('key,value,confidence').eq('kind', kind).order('confidence', { ascending: false });
+  for (const m of data ?? []) {
+    const k = normalize(String(m.key));
+    const v = m.value && typeof m.value === 'object' ? (m.value as Record<string, unknown>)[field] : null;
+    if (k && typeof v === 'string' && hay.some((h) => h.includes(` ${k} `))) return v;
+  }
+  return null;
+}
+
+async function merchantRule(ctx: ToolCtx, texts: (string | null | undefined)[]): Promise<{ id: string; label: string } | null> {
+  const id = await memoryFor(ctx, 'merchant_rule', 'category_id', texts);
   if (!id) return null;
   const { data: c } = await ctx.db.from('categories').select('id,name').eq('id', id).maybeSingle();
   return c ? { id: c.id, label: c.name } : null;
@@ -176,18 +186,18 @@ export const addTransaction: WriteTool<typeof txParams, TxResolved> = {
     let categoryId: string | null = null;
     let categoryLabel = 'Tanpa kategori';
     // SPEC 7.2: aturan merchant di memori dulu, baru kategori yang disebut, merchant, lalu kata di catatan
-    if (a.merchant) {
-      const rule = await merchantRule(ctx, a.merchant);
-      if (rule) { categoryId = rule.id; categoryLabel = rule.label; }
-    }
+    const rule = await merchantRule(ctx, [a.merchant, a.note]);
+    if (rule) { categoryId = rule.id; categoryLabel = rule.label; }
     if (!categoryId && a.category) {
       const r = await resolveCategory(ctx.db, a.category, a.kind);
       if (r.kind === 'found') { categoryId = r.id; categoryLabel = r.label; }
       else if (r.kind === 'ambiguous') return pick(r, 'category', 'kategori', a.category) as never;
     }
-    for (const text of [a.merchant, ...(a.note ?? '').split(/\s+/)]) {
+    // merchant dan catatan utuh boleh cocok longgar, kata lepas di catatan harus persis (hindari "pak" → "paket")
+    const guesses: [string | undefined, boolean][] = [[a.merchant, false], [a.note, true], ...(a.note ?? '').split(/\s+/).filter((w) => w.length >= 4).map((w) => [w, true] as [string, boolean])];
+    for (const [text, exact] of guesses) {
       if (categoryId || !text) continue;
-      const r = await resolveCategory(ctx.db, text, a.kind);
+      const r = await resolveCategory(ctx.db, text, a.kind, { exact });
       if (r.kind === 'found') { categoryId = r.id; categoryLabel = r.label; }
     }
     if (!categoryId) {
@@ -201,8 +211,11 @@ export const addTransaction: WriteTool<typeof txParams, TxResolved> = {
       if (isErr(r)) return r;
       accountId = r.id;
     } else {
-      accountId = await mostUsedAccount(ctx, categoryId);
-      doubtful.push('account');
+      // koreksi akun dari pengguna sebelumnya ("bensin" selalu GoPay) mengalahkan tebakan statistik
+      const learned = await memoryFor(ctx, 'correction', 'account_id', [a.merchant, a.note]);
+      const { data: ok } = learned ? await ctx.db.from('accounts').select('id').eq('id', learned).eq('is_archived', false).maybeSingle() : { data: null };
+      accountId = ok?.id ?? await mostUsedAccount(ctx, categoryId);
+      if (!ok) doubtful.push('account');
     }
     if (!accountId) return fail('Belum ada akun. Minta pengguna menambah akun dulu.', { field: 'account' });
     const accName = (await accountNames(ctx)).get(accountId);

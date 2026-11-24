@@ -1,4 +1,4 @@
-import { Bell, Brain, DatabaseBackup, FlaskConical, Languages, Palette, Settings, Zap } from 'lucide-react';
+import { Bell, Brain, DatabaseBackup, FlaskConical, History, Languages, Palette, Settings, Zap } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Avatar } from '@/components/ui/Avatar';
@@ -52,6 +52,7 @@ export default async function SayaPage() {
       <Section title="Ra dan aplikasi">
         <div className="card rows overflow-hidden">
           <MenuRow href="/pengaturan/memori" icon={Brain} title="Memori Ra" detail={memory.length ? `${memory.length} catatan · alias, aturan merchant, kebiasaan` : 'Alias akun, aturan merchant, kebiasaan'} />
+          <MenuRow href="/pengaturan/log-agen" icon={History} title="Log Agen" detail="Semua aksi Ra, bisa dibatalkan" />
           <MenuRow href="/pengaturan/tampilan" icon={Palette} title="Tampilan" detail={`${THEME[readTheme(settings.theme)]} · privasi saldo`} />
           <MenuRow href="/pengaturan/notifikasi" icon={Bell} title="Notifikasi"
             detail={`Briefing ${readText(settings.briefing_time).replace(':', '.') || '06.30'}${quiet ? ` · jam tenang ${quiet}` : ''}`} />
