@@ -813,10 +813,10 @@ Setiap fase selesai jika semua kriteria terpenuhi, build lolos, dan preview Verc
 - [x] English Mode di AgentBar (sakelar di Ra, umpan balik di bawah balasan, tersimpan sebagai `english_mode`)
 - [x] Otomasi review kosakata dan konten bahasa di briefing (kata hari ini di briefing pagi)
 
-**Fase 8 · Suara Tingkat 2 (Live API)**
-- [ ] Token sementara dari server, klien tersambung langsung
-- [ ] Tools yang sama, tool tulis tetap lewat konfirmasi layar
-- [ ] Mode percakapan untuk latihan bicara bahasa Inggris
+**Fase 8 · Suara Tingkat 2 (Live API)** (D-56)
+- [x] Token sementara dari server, klien tersambung langsung (`/api/live/token`, sekali pakai, konfigurasi terkunci)
+- [x] Tools yang sama, tool tulis tetap lewat konfirmasi layar (`/api/live/tool`, kartu di dalam percakapan)
+- [x] Mode percakapan untuk latihan bicara bahasa Inggris (`/bahasa/bicara`, tanpa tools)
 
 ---
 

@@ -13,6 +13,7 @@ import { RaAvatar } from './RaMark';
 import { ReceiptScanning } from './ReceiptScanning';
 import { RecordingView } from './RecordingView';
 import { EnglishFeedbackNote } from './EnglishFeedbackNote';
+import { LiveCall } from '@/components/live/LiveCall';
 import { UndoToast } from './UndoToast';
 
 const EXAMPLES = ['tadi beli bensin 30rb pakai gopay', 'tugas laporan RDTR dikumpul jumat jam 23.59', 'pindahin 500rb dari BCA ke Dana', 'sisa uang di semua akun berapa'];
@@ -22,7 +23,7 @@ type RaMsg = Extract<RaMessage, { from: 'ra' }>;
 
 /** Percakapan Ra (SPEC 6.2 dan 6.3). Dipakai panel laptop dan sheet HP. */
 export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<HTMLInputElement | null>; showCamera?: boolean }) {
-  const { messages, setMessages, conversationId, setConversationId, pickReceipts, scanning, voice, startVoice, stopVoice } = useRa();
+  const { messages, setMessages, conversationId, setConversationId, pickReceipts, scanning, voice, startVoice, stopVoice, liveOpen, setLiveOpen } = useRa();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [toast, setToast] = useState<{ text: string; ids: string[]; msgId: string } | null>(null);
@@ -78,6 +79,10 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
       return rest.length ? { actions: rest } : { status: 'cancelled' };
     });
   };
+
+  if (liveOpen) {
+    return <div className="flex h-full min-h-0 flex-col pt-3"><LiveCall onClose={() => setLiveOpen(false)} /></div>;
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">

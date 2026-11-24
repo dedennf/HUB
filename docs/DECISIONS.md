@@ -550,3 +550,17 @@ Sesi latihan dicatat ke `practice_sessions` (review saat dek selesai, baca saat 
 - English Mode tersimpan di setelan `english_mode`. Saat aktif, `/api/agent` menjalankan loop agen dan pemeriksaan bahasa secara paralel, jadi balasan tidak bertambah lama. Pemeriksaan hanya untuk pesan teks (bukan transkrip suara), menghormati tingkat koreksi (`off`, `important_only`, `all`), dan melewati pesan yang bukan bahasa Inggris. Pesan disimpan sebagai `writing_submissions` kind `english_mode` dan menambah `mistake_patterns`. Bila pemeriksaan gagal, balasan Ra tetap tampil.
 - Latihan bicara tingkat 1 memakai perekam dan pengaman sunyi dari Fase 5 (D-47, D-49). Gemini diminta menulis transkrip apa adanya dan menandai `heard_speech = false` bila tidak ada ucapan. Rekaman tidak disimpan. Transkrip dan skor masuk `practice_sessions.score`. UI menampilkan catatan bahwa penilaian pelafalan bersifat kasar (SPEC 10.2.4).
 - Teks bacaan yang ditempel bisa disimpan ke `readings.content_excerpt`, supaya bacaan dari modul Riset bisa dibuka lagi.
+
+---
+
+# Keputusan Fase 8 · Suara Tingkat 2
+
+## D-56 · Percakapan langsung lewat Gemini Live dengan token sementara
+**Status: Diputuskan**
+
+- **Token sementara (SPEC 7.3)**: `/api/live/token` membuat token Live API v1alpha (`authTokens.create`) yang sekali pakai, harus dipakai dalam 1 menit, dan berlaku paling lama 30 menit. Model, instruksi sistem, transkrip dua arah, dan deklarasi tools dikunci di token (`liveConnectConstraints`), jadi klien tidak bisa mengubahnya. `GEMINI_API_KEY` tidak pernah sampai ke browser. Batas 20 percakapan per jam.
+- **Klien tersambung langsung** ke Gemini lewat SDK `@google/genai` (dimuat dinamis saat dipakai). Mikrofon diambil lewat AudioWorklet (ScriptProcessor untuk Safari lama) dan dikirim sebagai PCM 16-bit 16 kHz per sekitar 100 ms. Suara Ra (PCM 24 kHz) diantrekan tanpa jeda dan dihentikan seketika saat Gemini memberi sinyal `interrupted` (pengguna memotong bicara). AudioContext pemutar dibuat di dalam klik "Mulai" supaya Safari mengizinkan suara.
+- **Tools sama, konfirmasi tetap di layar (SPEC 6.3)**: panggilan tool dari Gemini diteruskan klien ke `/api/live/tool`. Server menjalankan tool baca, atau mengubah tool tulis menjadi `agent_actions` proposed. Kartunya muncul di dalam percakapan dengan Setujui dan Tolak, dan Gemini menerima `{status: 'menunggu_konfirmasi'}`. Keputusan pengguna dikabarkan ke Gemini sebagai teks `[layar] ...` tanpa memicu giliran baru.
+- **Riwayat**: transkrip dua arah disimpan ke `agent_messages` saat percakapan diakhiri (`/api/live/end`, kanal `voice`, judul "Percakapan langsung"). Audio tidak disimpan.
+- **Mode bahasa Inggris**: di `/bahasa/bicara`, instruksi sistem berupa partner percakapan sesuai level, tujuan, tingkat koreksi, dan pola kesalahan teratas. Koreksi disampaikan dengan mengulang bentuk yang benar secara natural, tanpa ceramah. Mode ini tanpa tools. Durasi tercatat sebagai `practice_sessions` kind `speaking`.
+- **Verifikasi production**: `/api/agent/diagnose` membuat token dengan konfigurasi asisten yang sama persis (termasuk 38 tool), tersambung, dan menunggu jawaban pertama. Dengan begitu nama model Live dan penerimaan deklarasi tool bisa dipastikan di server asli. Uji lokal memakai server Live tiruan (WebSocket) dengan protokol yang sama.
