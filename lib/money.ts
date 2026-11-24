@@ -6,10 +6,8 @@ export function toRupiahInt(value: unknown): number {
   return Math.round(n);
 }
 
-export function formatRupiah(n: number | null | undefined): string {
-  const v = Math.round(Number(n) || 0);
-  return (v < 0 ? '-' : '') + 'Rp ' + Math.abs(v).toLocaleString('id-ID');
-}
+/** Format DESIGN: Rp1.500.000 (lihat lib/format.ts). */
+export { formatRp as formatRupiah } from './format';
 
 /**
  * Membaca input nominal: "15000", "15.000", "15rb", "15k", "1,5jt", "1.5 juta", "ceban", "goceng".

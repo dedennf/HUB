@@ -254,7 +254,7 @@ otp_expiry = 3600
 
 # Uncomment to customize email template
 [auth.email.template.magic_link]
-subject = "Masuk ke Hub Pribadi"
+subject = "Masuk ke Kompas"
 content_path = "./supabase/templates/magic_link.html"
 
 # [auth.email.template.invite]

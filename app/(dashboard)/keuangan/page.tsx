@@ -1,249 +1,269 @@
-import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
-import { Empty, Money, PageTitle, Section, Tabs } from '@/components/ui';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { AccountRow } from '@/components/ui/AccountRow';
+import { Balance } from '@/components/ui/Balance';
+import { CashflowCard } from '@/components/ui/CashflowCard';
+import { PersonRow } from '@/components/ui/PersonRow';
+import { PlanRow } from '@/components/ui/PlanRow';
+import { EmptyState, PageHeader, Section } from '@/components/ui/Section';
+import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import {
   db, getAccounts, getBills, getCategories, getDebts, getInvestments, getSavingsGoals, getSinkingFunds, getTransactionsInMonth,
+  getTransactionsSince,
 } from '@/lib/data';
-import { formatDateId, relativeDay, todayIso, zonedParts } from '@/lib/time';
+import { accountChange, budgetLines, cashflow, daysLeftInMonth } from '@/lib/finance';
+import { formatDayMonth, formatDayShort, formatMonthYear, formatRp, formatRpShort } from '@/lib/format';
+import { diffDays, todayIso, zonedParts } from '@/lib/time';
 import type { Account, Category, Transaction } from '@/lib/types';
 import { AccountForm } from './AccountForm';
 import { TransactionForm } from './TransactionForm';
 
-export const metadata: Metadata = { title: 'Keuangan' };
+export const metadata: Metadata = { title: 'Uang' };
 
 const TABS = [
-  { key: 'akun', label: 'Akun' },
+  { key: 'ringkasan', label: 'Ringkasan' },
   { key: 'transaksi', label: 'Transaksi' },
-  { key: 'tagihan', label: 'Tagihan' },
-  { key: 'utang', label: 'Utang & piutang' },
-  { key: 'lainnya', label: 'Target & investasi' },
-  { key: 'kategori', label: 'Kategori' },
+  { key: 'rencana', label: 'Rencana' },
+  { key: 'investasi', label: 'Investasi' },
 ];
-const TYPE_LABEL: Record<Account['type'], string> = { bank: 'Rekening bank', ewallet: 'Dompet digital', cash: 'Uang tunai', investment: 'Akun investasi' };
+/** Tab lama Fase 1a dialihkan ke tab baru. */
+const LEGACY_TAB: Record<string, string> = { akun: 'ringkasan', tagihan: 'rencana', utang: 'rencana', lainnya: 'rencana' };
 
 function shiftMonth(ym: string, n: number) {
   const [y, m] = ym.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + n, 1));
-  return d.toISOString().slice(0, 7);
+  return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7);
 }
 
-export default async function KeuanganPage({ searchParams }: PageProps<'/keuangan'>) {
+export default async function UangPage({ searchParams }: PageProps<'/keuangan'>) {
   const sp = await searchParams;
-  const tab = typeof sp.tab === 'string' && TABS.some((t) => t.key === sp.tab) ? sp.tab : 'akun';
+  const raw = typeof sp.tab === 'string' ? sp.tab : 'ringkasan';
+  if (raw === 'kategori') redirect('/pengaturan/kategori');
+  const tab = LEGACY_TAB[raw] ?? (TABS.some((t) => t.key === raw) ? raw : 'ringkasan');
   const today = todayIso();
   const ym = typeof sp.bulan === 'string' && /^\d{4}-\d{2}$/.test(sp.bulan) ? sp.bulan : today.slice(0, 7);
+  const jenis = sp.jenis === 'transfer' || sp.jenis === 'income' ? sp.jenis : 'expense';
   const s = await db();
   const [accounts, categories] = await Promise.all([getAccounts(s), getCategories(s)]);
 
   return (
-    <>
-      <PageTitle title="Keuangan" />
-      <Tabs current={tab} items={TABS.map((t) => ({ ...t, href: `/keuangan?tab=${t.key}` }))} />
-      {tab === 'akun' && <AccountsTab accounts={accounts} />}
-      {tab === 'transaksi' && <TransactionsTab ym={ym} today={today} accounts={accounts} categories={categories} />}
-      {tab === 'tagihan' && <BillsTab today={today} accounts={accounts} />}
-      {tab === 'utang' && <DebtsTab />}
-      {tab === 'lainnya' && <OthersTab />}
-      {tab === 'kategori' && <CategoriesTab categories={categories} />}
-    </>
-  );
-}
-
-function AccountsTab({ accounts }: { accounts: Account[] }) {
-  const active = accounts.filter((a) => !a.is_archived);
-  const archived = accounts.filter((a) => a.is_archived);
-  const total = active.reduce((n, a) => n + a.balance, 0);
-  return (
-    <div className="grid gap-4">
-      <Section title="Saldo akun" action={<span className="text-sm text-muted">Total <Money value={total} className="font-semibold text-ink" /></span>}>
-        {active.length ? (
-          <div className="list">
-            {active.map((a) => (
-              <Link key={a.id} href={`/keuangan/akun/${a.id}`} className="row hover:text-accent">
-                <span><span className="font-medium">{a.name}</span> <span className="text-xs text-muted">{TYPE_LABEL[a.type]}</span></span>
-                <Money value={a.balance} signed className="font-semibold" />
-              </Link>
-            ))}
-          </div>
-        ) : <Empty>Belum ada akun.</Empty>}
-      </Section>
-      <Section title="Tambah akun"><AccountForm /></Section>
-      {archived.length > 0 && (
-        <Section title="Diarsipkan">
-          <div className="list">
-            {archived.map((a) => (
-              <Link key={a.id} href={`/keuangan/akun/${a.id}`} className="row text-muted"><span>{a.name}</span><Money value={a.balance} /></Link>
-            ))}
-          </div>
-        </Section>
-      )}
+    <div className="flex flex-col gap-4">
+      <PageHeader title="Uang" />
+      <SegmentedTabs label="Bagian Uang" current={tab} items={TABS.map((t) => ({ ...t, href: `/keuangan?tab=${t.key}` }))} />
+      {tab === 'ringkasan' && <Ringkasan accounts={accounts} today={today} />}
+      {tab === 'transaksi' && <Transaksi ym={ym} today={today} accounts={accounts} categories={categories} jenis={jenis} />}
+      {tab === 'rencana' && <Rencana categories={categories} accounts={accounts} today={today} />}
+      {tab === 'investasi' && <Investasi accounts={accounts} />}
     </div>
   );
 }
 
-async function TransactionsTab({ ym, today, accounts, categories }: { ym: string; today: string; accounts: Account[]; categories: Category[] }) {
+async function Ringkasan({ accounts, today }: { accounts: Account[]; today: string }) {
   const s = await db();
-  const txs = await getTransactionsInMonth(s, ym);
+  const [monthTxs, goals, sinking, debts] = await Promise.all([
+    getTransactionsSince(s, `${today.slice(0, 7)}-01`), getSavingsGoals(s), getSinkingFunds(s), getDebts(s),
+  ]);
+  const flow = cashflow(monthTxs);
+  const active = accounts.filter((a) => !a.is_archived);
+  const archived = accounts.filter((a) => a.is_archived);
+  const receivables = debts.filter((d) => d.direction === 'receivable' && d.amount > d.paid_amount).length;
+  const planParts = [
+    goals.length ? `${goals.length} target tabungan` : '',
+    sinking.filter((f) => !f.is_done).length ? `${sinking.filter((f) => !f.is_done).length} biaya sejati` : '',
+    receivables ? `${receivables} piutang` : '',
+  ].filter(Boolean);
+  return (
+    <>
+      <CashflowCard monthLabel={formatMonthYear(today).split(' ')[0]} income={flow.income} expense={flow.expense} daysLeft={daysLeftInMonth(today)} />
+      <Section title="Akun saya">
+        {active.length ? (
+          <div className="card rows overflow-hidden">
+            {active.map((a) => <AccountRow key={a.id} account={a} change={accountChange(a.id, monthTxs)} href={`/keuangan/akun/${a.id}`} />)}
+          </div>
+        ) : <div className="card"><EmptyState>Belum ada akun. Tambahkan di bawah atau impor data lama.</EmptyState></div>}
+        <p className="mt-2 px-1 text-[12px] text-muted">Perubahan dihitung sejak awal bulan.</p>
+      </Section>
+      <Link href="/keuangan?tab=rencana" className="card flex min-h-[64px] items-center gap-3 p-4 hover:ring-1 hover:ring-accent">
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-semibold">Rencana keuangan</span>
+          <span className="block text-[12px] text-muted">{planParts.join(' · ') || 'Budget, target tabungan, tagihan, dan piutang'}</span>
+        </span>
+        <ChevronRight size={18} strokeWidth={1.8} className="text-muted" aria-hidden="true" />
+      </Link>
+      <details className="card p-4">
+        <summary className="flex min-h-11 cursor-pointer items-center text-[14px] font-semibold">Tambah akun</summary>
+        <div className="pt-3"><AccountForm /></div>
+      </details>
+      {archived.length > 0 && (
+        <Section title="Diarsipkan">
+          <div className="card rows overflow-hidden opacity-80">
+            {archived.map((a) => <AccountRow key={a.id} account={a} change={0} href={`/keuangan/akun/${a.id}`} />)}
+          </div>
+        </Section>
+      )}
+    </>
+  );
+}
+
+async function Transaksi({ ym, today, accounts, categories, jenis }: { ym: string; today: string; accounts: Account[]; categories: Category[]; jenis: 'expense' | 'income' | 'transfer' }) {
+  const txs = await getTransactionsInMonth(await db(), ym);
   const acc = new Map(accounts.map((a) => [a.id, a.name]));
   const cat = new Map(categories.map((c) => [c.id, c]));
-  const income = txs.filter((t) => t.kind === 'income').reduce((n, t) => n + t.amount, 0);
-  const expense = txs.filter((t) => t.kind === 'expense').reduce((n, t) => n + t.amount, 0);
+  const flow = cashflow(txs);
   const byDay = new Map<string, Transaction[]>();
   for (const t of txs) {
     const d = zonedParts(t.occurred_at).date;
     byDay.set(d, [...(byDay.get(d) ?? []), t]);
   }
-  const monthLabel = formatDateId(`${ym}-01`, { month: 'long', year: 'numeric' });
   return (
-    <div className="grid gap-4">
-      <Section title="Catat transaksi">
-        <TransactionForm accounts={accounts} categories={categories} initial={{ kind: 'expense', date: today }} />
-      </Section>
-      <Section
-        title={monthLabel}
-        action={
-          <div className="flex gap-2">
-            <Link className="btn btn-sm" href={`/keuangan?tab=transaksi&bulan=${shiftMonth(ym, -1)}`}>‹ Sebelumnya</Link>
-            <Link className="btn btn-sm" href={`/keuangan?tab=transaksi&bulan=${shiftMonth(ym, 1)}`}>Berikutnya ›</Link>
-          </div>
-        }
-      >
-        <div className="mb-3 flex flex-wrap gap-4 text-sm">
-          <span>Masuk <Money value={income} className="font-semibold text-positive" /></span>
-          <span>Keluar <Money value={expense} className="font-semibold text-danger" /></span>
-          <span>Selisih <Money value={income - expense} signed className="font-semibold" /></span>
-        </div>
-        {txs.length === 0 && <Empty>Tidak ada transaksi di bulan ini.</Empty>}
-        {[...byDay.entries()].map(([day, list]) => (
-          <div key={day} className="mb-3">
-            <div className="text-xs font-medium text-muted">{formatDateId(day, { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-            <div className="list">
-              {list.map((t) => {
-                const c = t.category_id ? cat.get(t.category_id) : null;
-                const title = t.kind === 'transfer'
-                  ? `${acc.get(t.account_id)} → ${acc.get(t.to_account_id ?? '')}`
-                  : `${c ? `${c.icon ?? ''} ${c.name}` : 'Tanpa kategori'}`;
-                return (
-                  <Link key={t.id} href={`/keuangan/transaksi/${t.id}`} className="row hover:text-accent">
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{title}</span>
-                      <span className="block truncate text-xs text-muted">
-                        {[t.kind !== 'transfer' ? acc.get(t.account_id) : 'Transfer', t.note].filter(Boolean).join(' · ')}
-                      </span>
-                    </span>
-                    <Money value={t.kind === 'expense' ? -t.amount : t.amount} signed={t.kind !== 'transfer'} className="shrink-0 font-semibold" />
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </Section>
-    </div>
-  );
-}
-
-async function BillsTab({ today, accounts }: { today: string; accounts: Account[] }) {
-  const bills = await getBills(await db());
-  const acc = new Map(accounts.map((a) => [a.id, a.name]));
-  const FREQ = { monthly: 'Bulanan', yearly: 'Tahunan', once: 'Sekali' } as const;
-  return (
-    <Section title="Tagihan">
-      {bills.length ? (
-        <div className="list">
-          {bills.map((b) => (
-            <div key={b.id} className={`row ${b.is_active ? '' : 'opacity-60'}`}>
-              <span>
-                <span className="block font-medium">{b.name}</span>
-                <span className="block text-xs text-muted">
-                  {FREQ[b.frequency]}
-                  {b.next_due_date ? ` · ${formatDateId(b.next_due_date)} (${relativeDay(b.next_due_date, today)})` : ''}
-                  {` · ${b.default_account_id ? acc.get(b.default_account_id) : 'akun belum diatur'}`}
-                </span>
-              </span>
-              <Money value={b.amount} className="font-semibold" />
-            </div>
-          ))}
-        </div>
-      ) : <Empty>Belum ada tagihan.</Empty>}
-      <p className="mt-2 text-xs text-muted">Menambah dan membayar tagihan dari layar ini hadir di Fase 1b.</p>
-    </Section>
-  );
-}
-
-async function DebtsTab() {
-  const debts = await getDebts(await db());
-  const rest = (d: { amount: number; paid_amount: number }) => d.amount - d.paid_amount;
-  const groups = [
-    { key: 'receivable', title: 'Piutang (orang lain berutang padamu)' },
-    { key: 'payable', title: 'Utang' },
-  ] as const;
-  return (
-    <div className="grid gap-4">
-      {groups.map((g) => {
-        const list = debts.filter((d) => d.direction === g.key);
-        const total = list.reduce((n, d) => n + rest(d), 0);
-        return (
-          <Section key={g.key} title={g.title} action={<span className="text-sm text-muted">Sisa <Money value={total} className="font-semibold text-ink" /></span>}>
-            {list.length ? (
-              <div className="list">
-                {list.map((d) => (
-                  <div key={d.id} className="row">
-                    <span>
-                      <span className="block font-medium">{d.person}</span>
-                      <span className="block text-xs text-muted">dibayar <Money value={d.paid_amount} /> dari <Money value={d.amount} />{d.due_on ? ` · jatuh tempo ${formatDateId(d.due_on)}` : ''}</span>
-                    </span>
-                    <Money value={rest(d)} className="font-semibold" />
-                  </div>
-                ))}
-              </div>
-            ) : <Empty>Tidak ada.</Empty>}
-          </Section>
-        );
-      })}
-    </div>
-  );
-}
-
-async function OthersTab() {
-  const s = await db();
-  const [goals, sinking, investments] = await Promise.all([getSavingsGoals(s), getSinkingFunds(s), getInvestments(s)]);
-  return (
-    <div className="grid gap-4 md:grid-cols-3">
-      <Section title="Target tabungan">
-        {goals.length ? <div className="list">{goals.map((g) => (
-          <div key={g.id} className="row"><span>{g.name}</span><span className="text-sm"><Money value={g.saved_amount} /> / <Money value={g.target_amount} /></span></div>
-        ))}</div> : <Empty>Belum ada.</Empty>}
-      </Section>
-      <Section title="Biaya sejati">
-        {sinking.length ? <div className="list">{sinking.map((f) => (
-          <div key={f.id} className="row"><span>{f.name}{f.due_on ? <span className="block text-xs text-muted">{formatDateId(f.due_on)}</span> : null}</span><span className="text-sm"><Money value={f.saved_amount} /> / <Money value={f.amount} /></span></div>
-        ))}</div> : <Empty>Belum ada.</Empty>}
-      </Section>
-      <Section title="Investasi">
-        {investments.length ? <div className="list">{investments.map((v) => (
-          <div key={v.id} className="row"><span>{v.name}<span className="block text-xs text-muted">{v.instrument}</span></span><Money value={v.current_value ?? 0} /></div>
-        ))}</div> : <Empty>Belum ada.</Empty>}
-      </Section>
-    </div>
-  );
-}
-
-function CategoriesTab({ categories }: { categories: Category[] }) {
-  return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {(['expense', 'income'] as const).map((k) => (
-        <Section key={k} title={k === 'expense' ? 'Kategori pengeluaran' : 'Kategori pemasukan'}>
-          <div className="list">
-            {categories.filter((c) => c.kind === k).map((c) => (
-              <div key={c.id} className={`row ${c.is_hidden ? 'opacity-50' : ''}`}>
-                <span>{c.icon} {c.name}{c.keywords.length ? <span className="block text-xs text-muted">{c.keywords.slice(0, 6).join(', ')}</span> : null}</span>
-                {c.monthly_budget != null && <span className="text-xs text-muted">budget <Money value={c.monthly_budget} /></span>}
+    <>
+      <section id="catat" className="card scroll-mt-4 p-4" aria-label="Catat transaksi">
+        <h2 className="h-section mb-3">Catat transaksi</h2>
+        <TransactionForm accounts={accounts} categories={categories} initial={{ kind: jenis, date: today }} />
+      </section>
+      <Section title={formatMonthYear(`${ym}-01`)} action={
+        <span className="flex gap-1">
+          <Link className="btn px-3" href={`/keuangan?tab=transaksi&bulan=${shiftMonth(ym, -1)}`} aria-label="Bulan sebelumnya">‹</Link>
+          <Link className="btn px-3" href={`/keuangan?tab=transaksi&bulan=${shiftMonth(ym, 1)}`} aria-label="Bulan berikutnya">›</Link>
+        </span>
+      }>
+        <p className="mb-2 px-1 text-[13px] text-muted">
+          Masuk <span className="num font-semibold text-positive">{formatRp(flow.income)}</span> · Keluar <span className="num font-semibold text-negative">{formatRp(flow.expense)}</span>
+        </p>
+        {txs.length === 0 ? <div className="card"><EmptyState>Tidak ada transaksi di bulan ini.</EmptyState></div> : (
+          <div className="flex flex-col gap-3">
+            {[...byDay.entries()].map(([day, list]) => (
+              <div key={day}>
+                <p className="mb-1.5 px-1 text-[12px] font-semibold text-muted">{formatDayShort(day)}</p>
+                <div className="card rows overflow-hidden">
+                  {list.map((t) => {
+                    const c = t.category_id ? cat.get(t.category_id) : null;
+                    const title = t.kind === 'transfer' ? `${acc.get(t.account_id)} → ${acc.get(t.to_account_id ?? '')}` : c?.name ?? 'Tanpa kategori';
+                    const sign = t.kind === 'expense' ? '−' : t.kind === 'income' ? '+' : '';
+                    return (
+                      <Link key={t.id} href={`/keuangan/transaksi/${t.id}`} className="flex min-h-[56px] items-center gap-3 px-4 py-2.5 hover:bg-bg">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[14px] font-semibold">{title}</span>
+                          <span className="block truncate text-[12px] text-muted">{[t.kind === 'transfer' ? 'Transfer' : acc.get(t.account_id), t.note].filter(Boolean).join(' · ')}</span>
+                        </span>
+                        <span className={`num shrink-0 text-[14px] font-bold ${t.kind === 'expense' ? 'text-negative' : t.kind === 'income' ? 'text-positive' : ''}`}>
+                          {sign}{formatRp(t.amount)}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </div>
-        </Section>
-      ))}
-    </div>
+        )}
+      </Section>
+    </>
   );
 }
+
+async function Rencana({ categories, accounts, today }: { categories: Category[]; accounts: Account[]; today: string }) {
+  const s = await db();
+  const [monthTxs, goals, sinking, debts, bills] = await Promise.all([
+    getTransactionsSince(s, `${today.slice(0, 7)}-01`), getSavingsGoals(s), getSinkingFunds(s), getDebts(s), getBills(s),
+  ]);
+  const budgets = budgetLines(categories, monthTxs, daysLeftInMonth(today));
+  const acc = new Map(accounts.map((a) => [a.id, a.name]));
+  const receivable = debts.filter((d) => d.direction === 'receivable' && d.amount > d.paid_amount);
+  const payable = debts.filter((d) => d.direction === 'payable' && d.amount > d.paid_amount);
+  const plans = [
+    ...goals.map((g) => ({ id: g.id, title: g.name, ratio: g.target_amount ? g.saved_amount / g.target_amount : 0,
+      detail: `${formatRpShort(g.saved_amount)} dari ${formatRpShort(g.target_amount)}${g.deadline ? ` · tenggat ${formatDayMonth(g.deadline)}` : ''}` })),
+    ...sinking.filter((f) => !f.is_done).map((f) => {
+      const months = f.due_on ? Math.max(1, Math.ceil(diffDays(f.due_on, today) / 30)) : 1;
+      const perMonth = Math.ceil(Math.max(0, f.amount - f.saved_amount) / months);
+      return { id: f.id, title: f.name, ratio: f.amount ? f.saved_amount / f.amount : 0, detail: `Sisihkan ${formatRpShort(perMonth)}/bulan` };
+    }),
+  ];
+  const activeBills = bills.filter((b) => b.is_active);
+  const debtDetail = (d: { occurred_on: string | null; due_on: string | null; paid_amount: number }) =>
+    [d.occurred_on ? `Sejak ${formatDayMonth(d.occurred_on)}` : '', d.paid_amount > 0 ? `sudah dibayar ${formatRpShort(d.paid_amount)}` : '', d.due_on ? `tenggat ${formatDayMonth(d.due_on)}` : ''].filter(Boolean).join(' · ') || 'Belum ada cicilan';
+
+  return (
+    <>
+      <Section title={`Budget ${formatMonthYear(today).split(' ')[0]}`}>
+        {budgets.length ? (
+          <div className="card rows overflow-hidden">
+            {budgets.map((b) => (
+              <PlanRow key={b.category.id} kind="budget" title={b.category.name} ratio={b.ratio}
+                detail={`${formatRpShort(b.spent)} dari ${formatRpShort(b.budget)}${b.perDayLeft != null ? ` · sisa ${formatRpShort(b.perDayLeft)}/hari` : ''}`} />
+            ))}
+          </div>
+        ) : <div className="card"><EmptyState>Belum ada budget. Atur budget per kategori di Pengaturan, Kategori dan budget.</EmptyState></div>}
+      </Section>
+      <Section title="Target tabungan & biaya sejati">
+        {plans.length ? <div className="card rows overflow-hidden">{plans.map((p) => <PlanRow key={p.id} kind="goal" title={p.title} detail={p.detail} ratio={p.ratio} />)}</div>
+          : <div className="card"><EmptyState>Belum ada target tabungan atau biaya sejati.</EmptyState></div>}
+      </Section>
+      <Section title="Tagihan">
+        {activeBills.length ? (
+          <div className="card rows overflow-hidden">
+            {activeBills.map((b) => {
+              const d = b.next_due_date ? diffDays(b.next_due_date, today) : null;
+              const when = d == null ? '' : d < 0 ? `lewat ${-d} hari` : d === 0 ? 'hari ini' : `${d} hari lagi`;
+              return (
+                <div key={b.id} className="flex min-h-[56px] items-center gap-3 px-4 py-2.5">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold">{b.name}</span>
+                    <span className={`block text-[12px] ${d != null && d < 0 ? 'text-negative' : 'text-muted'}`}>
+                      {[b.next_due_date ? `${formatDayMonth(b.next_due_date)} · ${when}` : '', b.default_account_id ? acc.get(b.default_account_id) : 'akun belum diatur'].filter(Boolean).join(' · ')}
+                    </span>
+                  </span>
+                  <span className="num text-[14px] font-bold">{formatRp(b.amount)}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : <div className="card"><EmptyState>Belum ada tagihan.</EmptyState></div>}
+      </Section>
+      <Section title={`Piutang · ${receivable.length} orang`}>
+        <div className="card rows overflow-hidden">
+          {receivable.length ? receivable.map((d) => <PersonRow key={d.id} name={d.person} detail={debtDetail(d)} amount={d.amount - d.paid_amount} />)
+            : <EmptyState>Tidak ada piutang.</EmptyState>}
+          {payable.length ? payable.map((d) => <PersonRow key={d.id} name={d.person} detail={`Utang · ${debtDetail(d)}`} amount={d.amount - d.paid_amount} />)
+            : <p className="px-4 py-3 text-[12px] text-muted">Utang: tidak ada</p>}
+        </div>
+      </Section>
+    </>
+  );
+}
+
+async function Investasi({ accounts }: { accounts: Account[] }) {
+  const investments = await getInvestments(await db());
+  const invAccounts = accounts.filter((a) => a.type === 'investment' && !a.is_archived);
+  const total = investments.reduce((n, v) => n + (v.current_value ?? 0), 0) + invAccounts.reduce((n, a) => n + a.balance, 0);
+  return (
+    <>
+      <section className="card p-4">
+        <p className="text-[13px] text-muted">Total investasi (tidak siap pakai)</p>
+        <p className="font-display text-[24px] font-extrabold"><Balance value={total} /></p>
+      </section>
+      <Section title="Akun investasi">
+        {invAccounts.length ? <div className="card rows overflow-hidden">{invAccounts.map((a) => <Link key={a.id} href={`/keuangan/akun/${a.id}`} className="flex min-h-[56px] items-center justify-between px-4 hover:bg-bg"><span className="text-[14px] font-semibold">{a.name}</span><Balance value={a.balance} className="text-[14px] font-bold" /></Link>)}</div>
+          : <div className="card"><EmptyState>Belum ada akun investasi.</EmptyState></div>}
+      </Section>
+      <Section title="Instrumen">
+        {investments.length ? (
+          <div className="card rows overflow-hidden">
+            {investments.map((v) => {
+              const gain = v.invested_amount ? ((v.current_value ?? 0) - v.invested_amount) / v.invested_amount : null;
+              return (
+                <div key={v.id} className="flex min-h-[56px] items-center gap-3 px-4 py-2.5">
+                  <span className="min-w-0 flex-1"><span className="block text-[14px] font-semibold">{v.name}</span><span className="block text-[12px] text-muted">{[v.instrument, v.platform].filter(Boolean).join(' · ')}</span></span>
+                  <span className="text-right"><Balance value={v.current_value ?? 0} className="block text-[14px] font-bold" />{gain != null && <span className={`num block text-[12px] font-semibold ${gain >= 0 ? 'text-positive' : 'text-negative'}`}>{gain >= 0 ? '▲' : '▼'} {Math.abs(Math.round(gain * 1000) / 10).toString().replace('.', ',')}%</span>}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : <div className="card"><EmptyState>Belum ada instrumen investasi.</EmptyState></div>}
+      </Section>
+    </>
+  );
+}
+

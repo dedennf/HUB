@@ -14,7 +14,7 @@ export function LoginForm() {
         {pending ? 'Mengirim...' : 'Kirim tautan masuk'}
       </button>
       {state.message && (
-        <p role="status" className={state.status === 'error' ? 'text-sm text-danger' : 'text-sm text-muted'}>{state.message}</p>
+        <p role="status" className={state.status === 'error' ? 'text-[13px] text-negative' : 'text-[13px] text-muted'}>{state.message}</p>
       )}
     </form>
   );

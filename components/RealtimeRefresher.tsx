@@ -33,11 +33,11 @@ export function RealtimeRefresher() {
     };
   }, [router]);
 
-  const label = status === 'live' ? 'Tersinkron' : status === 'offline' ? 'Offline' : 'Menyambung...';
+  // Hanya tampil saat sinkron terputus, agar tidak mengganggu tampilan (DESIGN tidak memuat indikator ini).
+  if (status !== 'offline') return null;
   return (
-    <span className="chip" title="Status sinkron antar perangkat" aria-live="polite">
-      <span className={`h-2 w-2 rounded-full ${status === 'live' ? 'bg-positive' : status === 'offline' ? 'bg-danger' : 'bg-warn'}`} />
-      {label}
-    </span>
+    <p role="status" className="fixed inset-x-4 top-3 z-40 mx-auto max-w-sm rounded-xl bg-warn-bg px-3 py-2 text-center text-[12px] text-warn-fg">
+      Sinkron terputus. Perubahan dari perangkat lain muncul setelah tersambung lagi.
+    </p>
   );
 }

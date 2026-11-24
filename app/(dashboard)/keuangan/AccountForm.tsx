@@ -13,7 +13,7 @@ const TYPES = [
 
 export function AccountForm({ account }: { account?: Account }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveAccount, { ok: false });
-  const err = (k: string) => state.fieldErrors?.[k] && <span className="mt-1 block text-xs text-danger">{state.fieldErrors[k]}</span>;
+  const err = (k: string) => state.fieldErrors?.[k] && <span className="mt-1 block text-[12px] text-negative">{state.fieldErrors[k]}</span>;
   return (
     <form action={action} className="grid gap-3 sm:grid-cols-2">
       {account && <input type="hidden" name="id" value={account.id} />}
@@ -30,8 +30,8 @@ export function AccountForm({ account }: { account?: Account }) {
       </label>
       <label>
         <span className="label">Saldo awal</span>
-        <input name="opening_balance" className="input" inputMode="decimal" defaultValue={account?.opening_balance ?? ''} placeholder="0" />
-        <span className="mt-1 block text-xs text-muted">Saldo sekarang dihitung otomatis dari saldo awal dan semua transaksi.</span>
+        <input name="opening_balance" className="input num" inputMode="decimal" defaultValue={account?.opening_balance ?? ''} placeholder="0" />
+        <span className="mt-1 block text-[12px] text-muted">Saldo sekarang dihitung otomatis dari saldo awal dan semua transaksi.</span>
         {err('opening_balance')}
       </label>
       <label>
@@ -39,13 +39,13 @@ export function AccountForm({ account }: { account?: Account }) {
         <input name="aliases" className="input" defaultValue={account?.aliases.join(', ')} placeholder="atm biru, rekening utama" />
       </label>
       {account && (
-        <label className="flex items-center gap-2 text-sm sm:col-span-2">
-          <input type="checkbox" name="is_archived" defaultChecked={account.is_archived} /> Arsipkan (sembunyikan dari pilihan)
+        <label className="flex min-h-11 items-center gap-2 text-[14px] sm:col-span-2">
+          <input type="checkbox" name="is_archived" defaultChecked={account.is_archived} className="h-5 w-5 accent-[var(--accent)]" /> Arsipkan (sembunyikan dari pilihan)
         </label>
       )}
       <div className="flex items-center gap-3 sm:col-span-2">
         <button className="btn btn-primary" disabled={pending}>{pending ? 'Menyimpan...' : 'Simpan akun'}</button>
-        {state.message && <span role="status" className={`text-sm ${state.ok ? 'text-positive' : 'text-danger'}`}>{state.message}</span>}
+        {state.message && <span role="status" className={`text-[13px] ${state.ok ? 'text-positive' : 'text-negative'}`}>{state.message}</span>}
       </div>
     </form>
   );

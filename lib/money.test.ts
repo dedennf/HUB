@@ -7,8 +7,8 @@ describe('money', () => {
     expect(toRupiahInt('abc')).toBe(0);
   });
   it('format rupiah', () => {
-    expect(formatRupiah(1500000)).toBe('Rp 1.500.000');
-    expect(formatRupiah(-2500)).toBe('-Rp 2.500');
+    expect(formatRupiah(1500000)).toBe('Rp1.500.000');
+    expect(formatRupiah(-2500)).toBe('\u2212Rp2.500');
   });
   it('membaca input nominal', () => {
     expect(parseRupiah('30rb')).toBe(30000);

@@ -1,6 +1,6 @@
-# Hub Pribadi
+# Kompas
 
-Dashboard pribadi satu pengguna untuk kuliah, riset, keuangan, dan belajar bahasa Inggris. Spesifikasi lengkap ada di `SPEC.md`, hasil audit di `docs/AUDIT.md`, dan keputusan teknis di `docs/DECISIONS.md`.
+Dashboard pribadi satu pengguna untuk kuliah, riset, keuangan, dan belajar bahasa Inggris, dengan asisten **Ra** (Gemini). Dulu bernama Hub Pribadi. Spesifikasi lengkap ada di `SPEC.md`, panduan tampilan di `docs/DESIGN.md`, hasil audit di `docs/AUDIT.md`, dan keputusan teknis di `docs/DECISIONS.md`.
 
 Stack: Next.js 16 (App Router, TypeScript, Tailwind 4), Supabase (Postgres, Auth, Realtime), Zod, Vitest.
 

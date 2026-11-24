@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
-import { Empty, PageTitle, Section } from '@/components/ui';
+import { ClassCard } from '@/components/ui/ClassCard';
+import { EmptyState, PageHeader, Section } from '@/components/ui/Section';
+import { TaskRow } from '@/components/ui/TaskRow';
 import { db, getCourses, getSchedules, getSemesters, getTasks } from '@/lib/data';
-import { formatDateId, relativeDay, todayIso, WEEKDAYS_ID, zonedParts } from '@/lib/time';
+import { formatDayMonth } from '@/lib/format';
+import { taskRowProps } from '@/lib/task-view';
+import { todayIso, WEEKDAYS_ID } from '@/lib/time';
 
 export const metadata: Metadata = { title: 'Kuliah' };
-
-const KIND = { assignment: 'Tugas', exam: 'Ujian', quiz: 'Kuis', practicum: 'Praktikum' } as Record<string, string>;
-const STATUS = { todo: 'Belum', in_progress: 'Dikerjakan', done: 'Selesai', overdue: 'Terlambat' } as Record<string, string>;
 
 export default async function KuliahPage() {
   const s = await db();
@@ -14,66 +15,59 @@ export default async function KuliahPage() {
   const today = todayIso();
   const active = semesters.find((x) => x.is_active);
   const shown = courses.filter((c) => !active || c.semester_id === active.id);
-  const course = new Map(courses.map((c) => [c.id, c]));
-  const open = tasks.filter((t) => t.status !== 'done');
-  const done = tasks.filter((t) => t.status === 'done');
+  const byId = new Map(courses.map((c) => [c.id, c]));
+  const roots = tasks.filter((t) => !t.parent_id);
+  const open = roots.filter((t) => t.status !== 'done').sort((a, b) => (a.due_at ?? '9999').localeCompare(b.due_at ?? '9999'));
+  const done = roots.filter((t) => t.status === 'done');
+  const kicker = active
+    ? `${active.name}${active.start_date && active.end_date ? ` · ${formatDayMonth(active.start_date)} sampai ${formatDayMonth(active.end_date)}` : ' · tanggal semester belum diatur'}`
+    : 'Belum ada semester aktif';
 
   return (
-    <>
-      <PageTitle title="Kuliah" kicker={active ? `${active.name}${active.start_date && active.end_date ? ` · ${formatDateId(active.start_date)} sampai ${formatDateId(active.end_date)}` : ' · tanggal belum diatur'}` : 'Belum ada semester aktif'} />
-      <div className="grid gap-4 md:grid-cols-2">
+    <div className="flex flex-col gap-4">
+      <PageHeader title="Kuliah" kicker={kicker} back={{ href: '/kalender', label: 'Agenda' }} />
+      <div className="grid gap-4 lg:grid-cols-2">
         <Section title="Tugas belum selesai">
-          {open.length ? (
-            <div className="list">
-              {open.map((t) => {
-                const d = t.due_at ? zonedParts(t.due_at).date : null;
-                const late = d && d < today;
-                return (
-                  <div key={t.id} className="row">
-                    <span>
-                      <span className="block font-medium">{t.title}</span>
-                      <span className="block text-xs text-muted">{[course.get(t.course_id ?? '')?.name, KIND[t.kind], t.priority === 'high' ? 'Prioritas tinggi' : '', STATUS[t.status]].filter(Boolean).join(' · ')}</span>
-                    </span>
-                    <span className={`text-xs ${late ? 'text-danger' : 'text-muted'}`}>{d ? `${formatDateId(d)} · ${relativeDay(d, today)}` : 'tanpa tenggat'}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : <Empty>Semua tugas beres.</Empty>}
-          {done.length > 0 && <p className="mt-2 text-xs text-muted">{done.length} tugas sudah selesai.</p>}
-        </Section>
-        <Section title="Jadwal mingguan">
-          {WEEKDAYS_ID.map((day, i) => {
-            const list = schedules.filter((x) => x.weekday === i + 1 && shown.some((c) => c.id === x.course_id));
-            if (!list.length) return null;
-            return (
-              <div key={day} className="mb-2">
-                <div className="text-xs font-medium text-muted">{day}</div>
-                {list.map((x) => (
-                  <div key={x.id} className="row text-sm">
-                    <span>{course.get(x.course_id)?.name}{x.location ? <span className="text-xs text-muted"> · {x.location}</span> : null}</span>
-                    <span className="text-xs text-muted">{x.start_time.slice(0, 5)}–{x.end_time.slice(0, 5)}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-          {!schedules.length && <Empty>Belum ada jadwal kelas.</Empty>}
+          {open.length ? <div className="card rows overflow-hidden">{open.map((t) => <TaskRow key={t.id} {...taskRowProps(t, byId, today)} />)}</div>
+            : <div className="card"><EmptyState>Semua tugas beres.</EmptyState></div>}
+          {done.length > 0 && (
+            <details className="mt-3">
+              <summary className="flex min-h-11 cursor-pointer items-center px-1 text-[13px] font-semibold text-muted">{done.length} tugas selesai</summary>
+              <div className="card rows overflow-hidden">{done.map((t) => <TaskRow key={t.id} {...taskRowProps(t, byId, today)} />)}</div>
+            </details>
+          )}
         </Section>
         <Section title="Mata kuliah">
           {shown.length ? (
-            <div className="list">
+            <div className="card rows overflow-hidden">
               {shown.map((c) => (
-                <div key={c.id} className="row">
-                  <span>{c.name}{c.alias ? <span className="text-xs text-muted"> ({c.alias})</span> : null}<span className="block text-xs text-muted">{c.lecturer ?? ''}</span></span>
-                  <span className="text-xs text-muted">{c.credits ?? '-'} SKS</span>
+                <div key={c.id} className="flex min-h-[56px] items-center justify-between gap-3 px-4 py-2.5">
+                  <span className="min-w-0"><span className="block text-[14px] font-semibold">{c.name}{c.alias ? <span className="font-normal text-muted"> ({c.alias})</span> : null}</span><span className="block text-[12px] text-muted">{c.lecturer ?? 'Dosen belum diisi'}</span></span>
+                  <span className="text-[12px] text-muted">{c.credits ?? '-'} SKS</span>
                 </div>
               ))}
             </div>
-          ) : <Empty>Belum ada mata kuliah.</Empty>}
-          <p className="mt-2 text-xs text-muted">Menambah dan mengubah data kuliah dari layar ini hadir di Fase 1b.</p>
+          ) : <div className="card"><EmptyState>Belum ada mata kuliah.</EmptyState></div>}
         </Section>
       </div>
-    </>
+      <Section title="Jadwal mingguan">
+        {schedules.length ? (
+          <div className="flex flex-col gap-3">
+            {WEEKDAYS_ID.map((day, i) => {
+              const list = schedules.filter((x) => x.weekday === i + 1 && shown.some((c) => c.id === x.course_id));
+              if (!list.length) return null;
+              return (
+                <div key={day}>
+                  <p className="mb-1.5 px-1 text-[12px] font-semibold text-muted">{day}</p>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {list.map((x) => <ClassCard key={x.id} title={byId.get(x.course_id)?.name ?? 'Kelas'} start={x.start_time} end={x.end_time} place={x.location} />)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : <div className="card"><EmptyState>Belum ada jadwal kelas.</EmptyState></div>}
+      </Section>
+    </div>
   );
 }
