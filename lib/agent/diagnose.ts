@@ -34,21 +34,34 @@ export async function diagnose(cfg: GeminiConfig, timeoutMs = 25_000): Promise<D
       return { model: p.model, test: p.test, ok: false, ms: Date.now() - t0, reason: me?.reason ?? 'galat', detail: (me?.detail || (e as Error).message || String(e)).slice(0, 400) };
     }
   }));
-  // transkripsi pesan suara (D-48): satu detik audio sunyi, mengukur waktu jawab saja
-  const silent = Buffer.alloc(44 + 32000);
-  silent.write('RIFF', 0); silent.writeUInt32LE(36 + 32000, 4); silent.write('WAVE', 8); silent.write('fmt ', 12);
-  silent.writeUInt32LE(16, 16); silent.writeUInt16LE(1, 20); silent.writeUInt16LE(1, 22); silent.writeUInt32LE(16000, 24);
-  silent.writeUInt32LE(32000, 28); silent.writeUInt16LE(2, 32); silent.writeUInt16LE(16, 34); silent.write('data', 36); silent.writeUInt32LE(32000, 40);
+  // transkripsi pesan suara (D-48, D-49): 1 detik nada 440 Hz, bukan ucapan. Mengukur waktu jawab dan
+  // memeriksa model tidak mengarang transkrip dari audio tanpa ucapan.
+  const tone = toneWav(1, 440);
   const t0 = Date.now();
   try {
-    const t = await transcribeAudio(new GeminiModel({ apiKey: cfg.apiKey, model: cfg.model, baseUrl: cfg.baseUrl, thinkingLevel: cfg.thinkingLevel }), { data: silent, mime: 'audio/wav' }, AbortSignal.timeout(timeoutMs));
-    cases.push({ model: cfg.model, test: 'transkripsi audio 1 detik (sunyi)', ok: true, ms: Date.now() - t0, reply: t ?? '(tidak jelas, sesuai harapan)' });
+    const t = await transcribeAudio(new GeminiModel({ apiKey: cfg.apiKey, model: cfg.model, baseUrl: cfg.baseUrl, thinkingLevel: cfg.thinkingLevel }), { data: tone, mime: 'audio/wav' }, AbortSignal.timeout(timeoutMs));
+    // audio sunyi harus menghasilkan "tidak jelas". Ada transkrip = model mengarang (D-49).
+    cases.push(t
+      ? { model: cfg.model, test: 'transkripsi audio 1 detik (nada, bukan ucapan)', ok: false, ms: Date.now() - t0, reason: 'halusinasi', detail: `Model mengarang transkrip dari audio tanpa ucapan: "${t.slice(0, 120)}"` }
+      : { model: cfg.model, test: 'transkripsi audio 1 detik (nada, bukan ucapan)', ok: true, ms: Date.now() - t0, reply: '(tidak jelas, sesuai harapan)' });
   } catch (e) {
     const me = e instanceof ModelError ? e : null;
-    cases.push({ model: cfg.model, test: 'transkripsi audio 1 detik (sunyi)', ok: false, ms: Date.now() - t0, reason: me?.reason ?? 'galat', detail: (me?.detail || (e as Error).message || String(e)).slice(0, 400) });
+    cases.push({ model: cfg.model, test: 'transkripsi audio 1 detik (nada, bukan ucapan)', ok: false, ms: Date.now() - t0, reason: me?.reason ?? 'galat', detail: (me?.detail || (e as Error).message || String(e)).slice(0, 400) });
   }
   return {
     config: { model: cfg.model, fallback_model: cfg.fallbackModel ?? null, thinking_level: cfg.thinkingLevel ?? 'low', base_url_set: !!cfg.baseUrl, api_key_set: !!cfg.apiKey },
     cases,
   };
+}
+
+/** WAV PCM 16-bit mono 16 kHz berisi nada sinus. */
+export function toneWav(seconds: number, hz: number): Buffer {
+  const rate = 16000;
+  const n = Math.round(seconds * rate);
+  const b = Buffer.alloc(44 + n * 2);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + n * 2, 4); b.write('WAVE', 8); b.write('fmt ', 12);
+  b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(rate, 24);
+  b.writeUInt32LE(rate * 2, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) b.writeInt16LE(Math.round(Math.sin((2 * Math.PI * hz * i) / rate) * 8000), 44 + i * 2);
+  return b;
 }

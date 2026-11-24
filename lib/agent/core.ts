@@ -14,6 +14,16 @@ export type AgentResult = { conversation_id: string; reply: string; action_ids: 
 
 const HISTORY_LIMIT = 16;
 
+type MessageRow = { conversation_id: string; role: 'user' | 'model' | 'tool'; content: Content };
+/**
+ * Simpan pesan satu giliran dengan created_at berurutan (selisih 1 ms). Satu insert berisi banyak baris
+ * memberi created_at yang sama, sehingga urutan riwayat (pengguna, model, tool, model) bisa tertukar.
+ */
+export async function insertMessages(db: SupabaseClient, rows: MessageRow[]): Promise<void> {
+  const base = Date.now();
+  await db.from('agent_messages').insert(rows.map((r, i) => ({ ...r, created_at: new Date(base + i).toISOString() })));
+}
+
 export async function ensureConversation(db: SupabaseClient, id: string | null, channel: string, title: string): Promise<string> {
   if (id) {
     const { data } = await db.from('agent_conversations').select('id').eq('id', id).maybeSingle();
@@ -53,7 +63,7 @@ export async function runAgent(opts: {
     if (!transcript) {
       const conversationId = await ensureConversation(db, opts.conversationId, 'voice', 'Pesan suara');
       const reply = 'Suaranya kurang jelas. Coba ulang lebih dekat ke mikrofon, atau ketik perintahnya.';
-      await db.from('agent_messages').insert([
+      await insertMessages(db, [
         { conversation_id: conversationId, role: 'user', content: { role: 'user', parts: [{ text: '[pesan suara] (tidak jelas)' }] } },
         { conversation_id: conversationId, role: 'model', content: { role: 'model', parts: [{ text: reply }] } },
       ]);
@@ -107,6 +117,6 @@ export async function runAgent(opts: {
       ? 'Permintaannya terlalu panjang untuk diproses sekaligus. Coba pecah jadi beberapa perintah.'
       : proposed.length ? 'Cek dulu sebelum disimpan.' : 'Oke.';
   }
-  await db.from('agent_messages').insert(newMessages.map((m) => ({ conversation_id: conversationId, role: m.role, content: m.content })));
+  await insertMessages(db, newMessages.map((m) => ({ conversation_id: conversationId, role: m.role, content: m.content })));
   return { conversation_id: conversationId, reply, action_ids: proposed, steps, english_feedback: null, ...(opts.audio ? { transcript: transcript ?? null } : {}) };
 }

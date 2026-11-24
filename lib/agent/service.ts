@@ -1,7 +1,7 @@
 // Lapisan yang dipakai route /api/agent*: batas laju, pilih Gemini atau cadangan, susun kartu untuk klien.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { cardFor, type ActionRow, type CardView, type Lookups } from './cards';
-import { ensureConversation, runAgent } from './core';
+import { ensureConversation, insertMessages, runAgent } from './core';
 import { runFallback } from './fallback';
 import { ModelError, type AgentModel } from './model';
 import type { ToolCtx } from './tools/types';
@@ -88,7 +88,7 @@ export async function handleMessage(ctx: ToolCtx, model: AgentModel | null, text
   const convId = await ensureConversation(ctx.db, conversationId, 'text', text);
   const r = await runFallback(ctx, text, convId);
   const replyText = [r.reply, ...(r.lines ?? [])].join('\n');
-  await ctx.db.from('agent_messages').insert([
+  await insertMessages(ctx.db, [
     { conversation_id: convId, role: 'user', content: { role: 'user', parts: [{ text }] } },
     { conversation_id: convId, role: 'model', content: { role: 'model', parts: [{ text: replyText }] } },
   ]);

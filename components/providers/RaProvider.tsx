@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
 import { ApiFailure, confirmActions, sendVoiceToRa } from '@/lib/agent/client';
-import { toGeminiAudio, VoiceRecorder } from '@/lib/voice/recorder';
+import { SILENCE_RMS, toGeminiAudio, VoiceRecorder } from '@/lib/voice/recorder';
 import type { CardView, Lookups } from '@/lib/agent/cards';
 import { createLocalFlag } from '@/lib/local-flag';
 import { ACCEPT_GALLERY, prepareReceipt, uploadReceipt, type PreparedReceipt } from '@/lib/receipts/client';
@@ -138,6 +138,11 @@ export function RaProvider({ children }: { children: ReactNode }) {
     if (!out || out.seconds < 1) {
       setVoice({ state: 'idle', seconds: 0, levels: [] });
       sayRa('Rekamannya terlalu pendek. Tahan tombol mic sambil bicara, atau ketuk sekali untuk mulai dan ketuk lagi untuk kirim.');
+      return;
+    }
+    if (out.peak >= 0 && out.peak < SILENCE_RMS) {
+      setVoice({ state: 'idle', seconds: 0, levels: [] });
+      sayRa('Tidak ada suara yang terdengar. Cek mikrofon, lalu bicara lebih dekat. Rekaman sunyi tidak dikirim.');
       return;
     }
     const msgId = Math.random().toString(36).slice(2);

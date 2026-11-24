@@ -477,3 +477,15 @@ Sekarang audio diproses dua tahap, keduanya oleh Gemini:
 2. **Loop agen biasa** dengan teks `[pesan suara] <transkrip>`. Konteks sistem memberi tahu bahwa teks itu transkrip otomatis yang mungkin salah dengar.
 
 Klien tetap mengirim audio mentah dan tidak ada speech-to-text di perangkat (SPEC 7.3). Yang berubah hanya urutan di server: Gemini menulis ucapan dulu, baru memahami dan memanggil tool, alih-alih keduanya dalam satu giliran. Aturan "Transkrip:" di jawaban akhir dihapus. Transkrip lebih andal karena tidak bergantung format jawaban model. `/api/agent/diagnose` menambah uji transkripsi audio 1 detik untuk mengukur waktunya di production.
+
+## D-49 · Rekaman sunyi tidak dikirim ke Gemini
+**Status: Diputuskan**
+
+Diagnosa production menunjukkan Gemini "mentranskripsi" 1 detik audio sunyi menjadi "Catat ya, beli kopi 25rb." Model mengarang perintah dari keheningan, dan prompt bertema keuangan ikut mendorongnya. Usulan hasil karangan itu tetap harus disetujui pengguna, tapi tidak boleh muncul sama sekali.
+
+Tiga lapis pengaman:
+1. **Browser**: perekam mencatat puncak RMS (Web Audio, `getByteTimeDomainData`). Di bawah 0,02 rekaman tidak dikirim, dan Ra menjawab "Tidak ada suara yang terdengar".
+2. **Server**: untuk WAV PCM 16-bit, puncak RMS dihitung per jendela 100 ms. Di bawah 0,01 transkripsi dilewati tanpa memanggil Gemini, sehingga ucapan pendek di antara jeda tetap lolos.
+3. **Prompt transkripsi**: tema keuangan dihapus. Model diminta hanya menulis ucapan manusia yang terdengar, dilarang mengarang, dan mengisi `clear = false` untuk sunyi, bising, atau musik.
+
+`/api/agent/diagnose` kini memakai 1 detik nada 440 Hz (bukan ucapan) sebagai uji transkripsi. Bila model mengembalikan transkrip, hasilnya ditandai `halusinasi`.
