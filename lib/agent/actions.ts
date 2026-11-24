@@ -29,7 +29,7 @@ type Row = {
 export type Edits = Record<string, Record<string, string>>;
 export type ConfirmResult = { ok: boolean; message: string; executed: string[] };
 
-const EDITABLE = new Set(['account', 'category', 'occurred_at', 'from_account', 'to_account', 'course', 'due_at']);
+const EDITABLE = new Set(['amount', 'account', 'category', 'occurred_at', 'from_account', 'to_account', 'course', 'due_at']);
 
 /** Kunci memori dari merchant atau catatan singkat. Catatan panjang tidak dijadikan aturan. */
 export function memoryKey(merchant: unknown, note: unknown): string | null {
@@ -69,8 +69,15 @@ async function loadRows(db: SupabaseClient, ids: string[], status: string): Prom
   return (data ?? []) as Row[];
 }
 
+/** Status struk mengikuti nasib usulannya (D-46): disetujui → confirmed, ditolak atau di-undo → rejected (boleh diunggah ulang). */
+async function setReceiptStatus(db: SupabaseClient, rows: { args: Record<string, unknown> }[], status: 'confirmed' | 'rejected') {
+  const ids = [...new Set(rows.map((r) => r.args?.receipt_id).filter((x): x is string => typeof x === 'string'))];
+  if (ids.length) await db.from('receipts').update({ status, updated_at: new Date().toISOString() }).in('id', ids);
+}
+
 export async function rejectActions(ctx: ToolCtx, ids: string[]): Promise<ConfirmResult> {
-  await ctx.db.from('agent_actions').update({ status: 'rejected', updated_at: ctx.now.toISOString() }).in('id', ids).eq('status', 'proposed');
+  const { data: rows } = await ctx.db.from('agent_actions').update({ status: 'rejected', updated_at: ctx.now.toISOString() }).in('id', ids).eq('status', 'proposed').select('args');
+  await setReceiptStatus(ctx.db, (rows ?? []) as { args: Record<string, unknown> }[], 'rejected');
   return { ok: true, message: 'Tidak disimpan.', executed: [] };
 }
 
@@ -115,7 +122,9 @@ export async function approveActions(ctx: ToolCtx, ids: string[], edits: Edits =
       status: 'executed', args: resolved, summary, undo_payload: payload, executed_at: ctx.now.toISOString(),
       result: { ...row.result, data: res.data ?? null, edited: Object.keys(change) },
     }).eq('id', row.id);
+    row.args = resolved;
   }
+  await setReceiptStatus(ctx.db, done.map((d) => d.row), 'confirmed');
   return { ok: true, message: `Tersimpan: ${done.map((d) => d.row.summary.split(' · ')[0]).join(', ')}`, executed: done.map((d) => d.row.id) };
 }
 
@@ -129,6 +138,7 @@ export async function undoActions(ctx: ToolCtx, ids: string[]): Promise<{ ok: bo
     const r = await undo(ctx, row.undo_payload);
     if (!r.ok) { errors.push(...r.errors); continue; }
     await ctx.db.from('agent_actions').update({ status: 'undone', updated_at: ctx.now.toISOString() }).eq('id', row.id);
+    await setReceiptStatus(ctx.db, [row], 'rejected');
   }
   return errors.length ? { ok: false, message: `Sebagian gagal dibatalkan: ${errors.join('; ')}` } : { ok: true, message: 'Dibatalkan.' };
 }

@@ -17,7 +17,7 @@ describe('cardFor', () => {
     expect(c.chips).toEqual([
       { label: 'Transportasi', doubtful: false, field: 'category', edit: 'category_expense', value: 'c1' },
       { label: 'GoPay', doubtful: true, field: 'account', edit: 'account', value: 'a1' },
-      { label: 'Hari ini', field: 'occurred_at', edit: 'date', value: '2026-11-24' },
+      { label: 'Hari ini', doubtful: false, field: 'occurred_at', edit: 'date', value: '2026-11-24' },
     ]);
     expect(c.note).toBe('Catatan: bensin. Akun ditebak.');
   });
@@ -44,5 +44,14 @@ describe('memoryKey', () => {
     expect(memoryKey('Pertamina', 'bensin')).toBe('pertamina');
     expect(memoryKey(null, 'Makan Siang')).toBe('makan siang');
     expect(memoryKey(null, 'beli buku untuk kuliah besok pagi')).toBeNull();
+  });
+});
+
+describe('cardFor dari struk', () => {
+  it('nominal meragukan memunculkan chip "Cek nominal" yang bisa diubah, tanggal ikut ditandai', () => {
+    const c = cardFor(row({ args: { kind: 'expense', amount: 25500, category_id: 'c1', account_id: 'a1', merchant: 'Indomaret', occurred_at: '2026-11-24T05:00:00.000Z', receipt_id: 'r1' }, result: { doubtful: ['amount', 'date'], warning: 'Struk kurang jelas.' } }), lk, today);
+    expect(c.chips.at(-1)).toEqual({ label: 'Cek nominal', doubtful: true, field: 'amount', edit: 'amount', value: '25500' });
+    expect(c.chips[2].doubtful).toBe(true);
+    expect(c.warn).toBe(true);
   });
 });

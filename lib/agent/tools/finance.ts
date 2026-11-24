@@ -226,7 +226,7 @@ export const addTransaction: WriteTool<typeof txParams, TxResolved> = {
       summary: `${KIND_LABEL[a.kind]} ${rp(a.amount)} · ${categoryLabel} · ${accName}${date !== ctx.today ? ` · ${date}` : ''}`,
       doubtful: doubtful.length ? doubtful : undefined,
       warning: doubtful.includes('account') ? 'Akun tidak disebut, dipilih akun yang paling sering dipakai.' : undefined,
-      resolved: { kind: a.kind, amount: a.amount, account_id: accountId, category_id: categoryId, merchant: a.merchant ?? null, note: a.note ?? null, occurred_at: occurred, receipt_id: a.receipt_id ?? null, source: 'agent' },
+      resolved: { kind: a.kind, amount: a.amount, account_id: accountId, category_id: categoryId, merchant: a.merchant ?? null, note: a.note ?? null, occurred_at: occurred, receipt_id: a.receipt_id ?? null, source: a.receipt_id ? 'receipt' : 'agent' },
     };
   },
   async commit(ctx, r) {
@@ -242,8 +242,9 @@ const tfParams = z.object({
   to_account: z.string().describe('Akun tujuan. "Top up" = ke dompet digital.'),
   fee: money('Biaya admin, dicatat sebagai pengeluaran terpisah').optional(),
   occurred_at: when('Waktu, kosong = sekarang').optional(),
+  receipt_id: z.uuid().optional().describe('Id struk atau bukti transfer bila dari gambar'),
 });
-type TfResolved = { amount: number; from: string; to: string; fee: number; occurred_at: string };
+type TfResolved = { amount: number; from: string; to: string; fee: number; occurred_at: string; receipt_id?: string | null };
 
 export const addTransfer: WriteTool<typeof tfParams, TfResolved> = {
   name: 'add_transfer', module: 'finance', permission: 'write',
@@ -259,18 +260,19 @@ export const addTransfer: WriteTool<typeof tfParams, TfResolved> = {
     return {
       ok: true,
       summary: `Transfer ${rp(a.amount)} · ${from.label} → ${to.label}${a.fee ? ` · admin ${rp(a.fee)}` : ''}`,
-      resolved: { amount: a.amount, from: from.id, to: to.id, fee: a.fee ?? 0, occurred_at: occurred },
+      resolved: { amount: a.amount, from: from.id, to: to.id, fee: a.fee ?? 0, occurred_at: occurred, receipt_id: a.receipt_id ?? null },
     };
   },
   async commit(ctx, r) {
     const group = r.fee > 0 ? crypto.randomUUID() : null;
     const ops: UndoOp[] = [];
-    const t = await insertRow(ctx, 'transactions', { kind: 'transfer', amount: r.amount, account_id: r.from, to_account_id: r.to, occurred_at: r.occurred_at, group_id: group, source: 'agent', note: 'Transfer' });
+    const source = r.receipt_id ? 'receipt' : 'agent';
+    const t = await insertRow(ctx, 'transactions', { kind: 'transfer', amount: r.amount, account_id: r.from, to_account_id: r.to, occurred_at: r.occurred_at, group_id: group, source, note: 'Transfer', receipt_id: r.receipt_id ?? null });
     if (isErr(t)) return t;
     ops.push(t.undo);
     if (group) {
       const { data: admin } = await ctx.db.from('categories').select('id').eq('slug', 'o_admin').maybeSingle();
-      const f = await insertRow(ctx, 'transactions', { kind: 'expense', amount: r.fee, account_id: r.from, category_id: admin?.id ?? null, occurred_at: r.occurred_at, group_id: group, source: 'agent', note: 'Biaya admin' });
+      const f = await insertRow(ctx, 'transactions', { kind: 'expense', amount: r.fee, account_id: r.from, category_id: admin?.id ?? null, occurred_at: r.occurred_at, group_id: group, source, note: 'Biaya admin' });
       if (isErr(f)) { await ctx.db.from('transactions').delete().eq('id', t.id); return f; }
       ops.push(f.undo);
     }

@@ -4,10 +4,11 @@ import type { RefObject } from 'react';
 
 /**
  * Bar input Ra: kamera, galeri, teks, mikrofon (DESIGN 6).
- * Teks aktif bila `onSubmit` diberikan (pengurai lokal, D-32). Kamera, galeri, dan mic menunggu fase Struk dan Suara.
+ * Teks aktif bila `onSubmit` diberikan. Kamera dan galeri aktif bila `onPick` diberikan (Fase 4). Mic menunggu fase Suara.
  */
-export function RaInputBar({ inputRef, onSubmit, busy = false, showCamera = true }: {
+export function RaInputBar({ inputRef, onSubmit, busy = false, showCamera = true, onPick, picking = false }: {
   inputRef?: RefObject<HTMLInputElement | null>; onSubmit?: (text: string) => void; busy?: boolean; showCamera?: boolean;
+  onPick?: (mode: 'camera' | 'gallery') => void; picking?: boolean;
 }) {
   const active = !!onSubmit;
   const iconBtn = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-fg disabled:opacity-50';
@@ -21,11 +22,11 @@ export function RaInputBar({ inputRef, onSubmit, busy = false, showCamera = true
       input.value = '';
     }}>
       {showCamera && (
-        <button type="button" className={iconBtn} aria-label="Foto struk dengan kamera (segera hadir)" disabled>
+        <button type="button" className={iconBtn} aria-label={onPick ? 'Foto struk dengan kamera' : 'Foto struk dengan kamera (segera hadir)'} disabled={!onPick || picking} onClick={() => onPick?.('camera')}>
           <Camera size={20} strokeWidth={1.8} aria-hidden="true" />
         </button>
       )}
-      <button type="button" className={iconBtn} aria-label="Pilih struk dari galeri (segera hadir)" disabled>
+      <button type="button" className={iconBtn} aria-label={onPick ? 'Pilih struk dari galeri atau berkas (bisa beberapa, PDF juga)' : 'Pilih struk dari galeri (segera hadir)'} disabled={!onPick || picking} onClick={() => onPick?.('gallery')}>
         <ImageIcon size={20} strokeWidth={1.8} aria-hidden="true" />
       </button>
       <label className="min-w-0 flex-1">

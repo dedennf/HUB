@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition, type RefObject } from 'react';
 import { ApiFailure, confirmActions, sendToRa, undoActions } from '@/lib/agent/client';
@@ -9,6 +10,7 @@ import { OfflineBanner } from './OfflineBanner';
 import { ProposalCard } from './ProposalCard';
 import { RaInputBar } from './RaInputBar';
 import { RaAvatar } from './RaMark';
+import { ReceiptScanning } from './ReceiptScanning';
 import { UndoToast } from './UndoToast';
 
 const EXAMPLES = ['tadi beli bensin 30rb pakai gopay', 'tugas laporan RDTR dikumpul jumat jam 23.59', 'pindahin 500rb dari BCA ke Dana', 'sisa uang di semua akun berapa'];
@@ -18,7 +20,7 @@ type RaMsg = Extract<RaMessage, { from: 'ra' }>;
 
 /** Percakapan Ra (SPEC 6.2 dan 6.3). Dipakai panel laptop dan sheet HP. */
 export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<HTMLInputElement | null>; showCamera?: boolean }) {
-  const { messages, setMessages, conversationId, setConversationId } = useRa();
+  const { messages, setMessages, conversationId, setConversationId, pickReceipts, scanning } = useRa();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [toast, setToast] = useState<{ text: string; ids: string[]; msgId: string } | null>(null);
@@ -27,7 +29,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
   const [saving, setSaving] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [messages.length, pending]);
+  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [messages.length, pending, scanning]);
 
   const say = (text: string, extra: Partial<RaMsg> = {}) => setMessages((m) => [...m, { id: uid(), from: 'ra', text, ...extra }]);
   const update = (id: string, patch: Partial<RaMsg> | ((x: RaMsg) => Partial<RaMsg>)) =>
@@ -82,7 +84,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
           <div className="flex flex-col items-center gap-3 px-2 py-6 text-center">
             <RaAvatar size={44} />
             <p className="font-display text-[16px] font-bold">Catat apa hari ini?</p>
-            <p className="max-w-72 text-[13px] text-muted">Tulis seperti chat biasa. Transaksi, tugas, transfer, atau pertanyaan saldo. Tidak ada yang tersimpan sebelum kamu setujui.</p>
+            <p className="max-w-72 text-[13px] text-muted">Tulis seperti chat biasa, atau kirim foto struk dan bukti transfer. Tidak ada yang tersimpan sebelum kamu setujui.</p>
             <div className="flex flex-wrap justify-center gap-2">
               {EXAMPLES.map((e) => (
                 <button key={e} type="button" onClick={() => send(e)} className="min-h-11 rounded-xl border border-line bg-surface px-3 text-[12px] text-fg hover:border-accent">{e}</button>
@@ -91,11 +93,26 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
           </div>
         ) : (
           <div className="flex flex-col gap-3 pt-3">
-            {messages.map((m) => m.from === 'user' ? <ChatBubble key={m.id} from="user">{m.text}</ChatBubble> : (
+            {messages.map((m) => m.from === 'user' ? (
+              <div key={m.id} className="flex flex-col items-end gap-1.5">
+                {m.images && m.images.length > 0 && (
+                  <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
+                    {m.images.map((src, i) => src
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img key={i} src={src} alt={`Struk ${i + 1}`} className="h-20 w-16 rounded-xl border border-line object-cover" />
+                      : <span key={i} className="flex h-20 w-16 items-center justify-center rounded-xl border border-line bg-surface text-[11px] font-semibold text-muted">PDF/HEIC</span>)}
+                  </div>
+                )}
+                <ChatBubble from="user">{m.text}</ChatBubble>
+              </div>
+            ) : (
               <div key={m.id} className="flex flex-col gap-2.5">
                 {m.offline && <OfflineBanner reason={m.offline} />}
                 <ChatBubble from="ra"><span className="whitespace-pre-line">{m.text}</span></ChatBubble>
                 {m.lines && <ul className="card rows overflow-hidden text-[13px]">{m.lines.map((l, i) => <li key={i} className="px-4 py-2.5">{l}</li>)}</ul>}
+                {m.links && m.links.map((l) => (
+                  <Link key={l.href} href={l.href} className="inline-flex min-h-11 items-center text-[13px] font-semibold text-accent underline-offset-2 hover:underline">{l.label}</Link>
+                ))}
                 {m.actions && m.actions.length > 0 && m.status !== 'cancelled' && (
                   <div className={`flex flex-col gap-2.5 ${m.status === 'pending' ? '' : 'opacity-60'}`}>
                     {m.actions.map((a) => (
@@ -115,11 +132,17 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
               </div>
             ))}
             {pending && <p className="text-[13px] text-muted" role="status">Ra membaca...</p>}
+            {scanning && (
+              <div>
+                <ReceiptScanning imageUrl={scanning.preview ?? undefined} />
+                {scanning.total > 1 && <p className="mt-1 text-[12px] text-muted">Struk {scanning.done + 1} dari {scanning.total}</p>}
+              </div>
+            )}
             <div ref={endRef} />
           </div>
         )}
       </div>
-      <RaInputBar inputRef={inputRef} onSubmit={send} busy={pending} showCamera={showCamera} />
+      <RaInputBar inputRef={inputRef} onSubmit={send} busy={pending} showCamera={showCamera} onPick={pickReceipts} picking={!!scanning} />
       {toast && (
         <UndoToast key={toast.msgId} message={toast.text} undoing={undoing} onDone={() => setToast(null)}
           onUndo={async () => {

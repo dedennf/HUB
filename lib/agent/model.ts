@@ -4,7 +4,8 @@ import { ApiError, GoogleGenAI, ThinkingLevel as GenaiThinkingLevel, type Conten
 export type { Content };
 export type FunctionCallOut = { id?: string; name: string; args: Record<string, unknown> };
 export type ModelTurn = { content: Content; functionCalls: FunctionCallOut[]; text: string };
-export type ModelRequest = { system: string; contents: Content[]; tools: FunctionDeclaration[]; signal?: AbortSignal };
+/** `json`: JSON Schema untuk output terstruktur (mis. ekstraksi struk). Bila diisi, jawaban model berupa teks JSON. */
+export type ModelRequest = { system: string; contents: Content[]; tools: FunctionDeclaration[]; signal?: AbortSignal; json?: unknown };
 
 export interface AgentModel {
   readonly name: string;
@@ -100,8 +101,9 @@ export class GeminiModel implements AgentModel {
         contents: req.contents,
         config: {
           systemInstruction: req.system,
-          tools: [{ functionDeclarations: req.tools }],
-          temperature: 0.2,
+          ...(req.tools.length ? { tools: [{ functionDeclarations: req.tools }] } : {}),
+          ...(req.json ? { responseMimeType: 'application/json', responseJsonSchema: req.json } : {}),
+          temperature: req.json ? 0 : 0.2,
           abortSignal: req.signal,
           automaticFunctionCalling: { disable: true },
           ...(this.usesThinkingLevel(model) ? { thinkingConfig: { thinkingLevel: this.thinkingLevel.toUpperCase() as GenaiThinkingLevel } } : {}),
