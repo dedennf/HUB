@@ -1,7 +1,7 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition, type RefObject } from 'react';
-import { confirmActions, sendToRa, undoActions } from '@/lib/agent/client';
+import { ApiFailure, confirmActions, sendToRa, undoActions } from '@/lib/agent/client';
 import { useRa, type RaMessage } from '@/components/providers/RaProvider';
 import { ActionBar } from './ActionBar';
 import { ChatBubble } from './ChatBubble';
@@ -44,7 +44,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
         setConversationId(r.conversation_id);
         say(r.reply, { lines: r.lines, actions: r.proposed_actions, lookups: r.lookups, offline: r.offline, edits: {}, status: r.proposed_actions.length ? 'pending' : undefined });
       } catch (e) {
-        say((e as Error).message.startsWith('Terlalu banyak') ? (e as Error).message : 'Ra sedang tidak tersambung ke server. Coba lagi sebentar lagi.');
+        say(e instanceof ApiFailure ? e.message : 'Ra sedang tidak tersambung ke server. Coba lagi sebentar lagi.');
       }
     });
   };

@@ -1,10 +1,23 @@
 // Pemanggil API agen dari browser. Semua keputusan (setujui, tolak, undo) dikirim dengan id aksi saja.
 import type { AgentResponse } from './service';
 
+/** Galat dari API agen, pesannya sudah ramah ditampilkan. */
+export class ApiFailure extends Error {
+  constructor(message: string, public readonly status: number) { super(message); }
+}
+
 async function post<T>(url: string, body: unknown, form = false): Promise<T> {
-  const res = await fetch(url, form ? { method: 'POST', body: body as FormData } : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  let res: Response;
+  try {
+    res = await fetch(url, form ? { method: 'POST', body: body as FormData } : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  } catch {
+    throw new ApiFailure('Tidak bisa menghubungi server Kompas. Cek koneksi internet.', 0);
+  }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok && !('message' in data)) throw new Error(data.error ?? `HTTP ${res.status}`);
+  if (!res.ok && !('message' in data)) {
+    const fallback = res.status === 504 ? 'Server terlalu lama menjawab (504).' : res.status === 401 ? 'Sesi login habis. Muat ulang halaman lalu login lagi.' : `Server menjawab galat ${res.status}.`;
+    throw new ApiFailure(data.error ?? fallback, res.status);
+  }
   return data as T;
 }
 

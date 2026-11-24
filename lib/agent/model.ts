@@ -32,7 +32,7 @@ export class GeminiModel implements AgentModel {
   readonly name: string;
 
   constructor(cfg: { apiKey: string; model: string; baseUrl?: string }) {
-    this.ai = new GoogleGenAI({ apiKey: cfg.apiKey, httpOptions: { timeout: 30_000, ...(cfg.baseUrl ? { baseUrl: cfg.baseUrl } : {}) } });
+    this.ai = new GoogleGenAI({ apiKey: cfg.apiKey, httpOptions: { timeout: 20_000, ...(cfg.baseUrl ? { baseUrl: cfg.baseUrl } : {}) } });
     this.name = cfg.model;
   }
 

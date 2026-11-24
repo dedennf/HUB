@@ -192,6 +192,26 @@ describe.skipIf(!run)('loop agen dengan model palsu', () => {
     expect(none.lines?.some((l) => l.startsWith('BCA'))).toBe(true);
   });
 
+  it('galat tak terduga di loop agen: tetap dilayani pengurai lokal', async () => {
+    const buggy: AgentModel = { name: 'bug', generate: async () => { throw new TypeError('x is undefined'); } };
+    const r = await handleMessage(ctx(), buggy, 'kopi 18rb dana', null);
+    expect(r.offline).toBe('galat di server Ra');
+    expect(r.proposed_actions[0]).toMatchObject({ value: 'Rp18.000' });
+    await rejectActions(ctx(), [r.proposed_actions[0].id]);
+  });
+
+  it('Gemini terlalu lama: dihentikan oleh batas waktu lalu pengurai lokal', async () => {
+    const slow: AgentModel = {
+      name: 'lambat',
+      generate: (req) => new Promise((_, reject) => req.signal?.addEventListener('abort', () => reject(new ModelError('timeout', 'lambat')))),
+    };
+    const t0 = Date.now();
+    const r = await handleMessage(ctx(), slow, 'saldo berapa?', null, { budgetMs: 300 });
+    expect(Date.now() - t0).toBeLessThan(5000);
+    expect(r.offline).toBe('Gemini terlalu lama menjawab');
+    expect(r.lines?.length).toBeGreaterThan(0);
+  });
+
   it('batas laju 30 pesan per menit', async () => {
     const { data: conv } = await db.from('agent_conversations').insert({ channel: 'text' }).select('id').single();
     await db.from('agent_messages').insert(Array.from({ length: 30 }, () => ({ conversation_id: conv!.id, role: 'user', content: { role: 'user', parts: [{ text: 'x' }] } })));
