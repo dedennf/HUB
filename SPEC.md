@@ -770,9 +770,9 @@ Setiap fase selesai jika semua kriteria terpenuhi, build lolos, dan preview Verc
 - [x] Target sentuh ≥ 44 px, lolos axe-core WCAG 2 AA, bisa dipakai dengan keyboard (Ctrl+K)
 - [x] Dicek di 390 px dan 1440 px, terang dan gelap (Supabase lokal, D-27 sampai D-30)
 
-**Fase 1c · Port fitur lama** (usulan, menunggu persetujuan pemilik)
-- [ ] Input di semua modul: tugas, mata kuliah, jadwal, materi, acara, libur, riset, tagihan dan Bayar, utang, budget, target tabungan, investasi, kategori
-- [ ] Dock input cepat dengan pengurai lokal, Cocokkan saldo, kalender bulan dan minggu, ekspor cadangan JSON dan CSV
+**Fase 1c · Port fitur lama** (disetujui pemilik, D-31 sampai D-34)
+- [x] Input di semua modul: tugas, mata kuliah, jadwal, materi, semester, acara, libur, riset, tagihan dan Bayar, utang dan cicilan, budget, target tabungan, biaya sejati, investasi, kategori
+- [x] Input cepat lewat Ra dengan pengurai lokal (kartu usulan, Setujui, Batalkan), Cocokkan saldo, kalender bulan dan minggu, ekspor cadangan JSON dan CSV
 
 **Fase 2 · Tools dan API**
 - [ ] Registry tools lengkap Bagian 6.8 dengan validasi Zod

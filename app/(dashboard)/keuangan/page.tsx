@@ -7,7 +7,7 @@ import { Balance } from '@/components/ui/Balance';
 import { CashflowCard } from '@/components/ui/CashflowCard';
 import { PersonRow } from '@/components/ui/PersonRow';
 import { PlanRow } from '@/components/ui/PlanRow';
-import { EmptyState, PageHeader, Section } from '@/components/ui/Section';
+import { AddButton, EmptyState, PageHeader, Section } from '@/components/ui/Section';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
 import {
   db, getAccounts, getBills, getCategories, getDebts, getInvestments, getSavingsGoals, getSinkingFunds, getTransactionsInMonth,
@@ -76,7 +76,7 @@ async function Ringkasan({ accounts, today }: { accounts: Account[]; today: stri
   return (
     <>
       <CashflowCard monthLabel={formatMonthYear(today).split(' ')[0]} income={flow.income} expense={flow.expense} daysLeft={daysLeftInMonth(today)} />
-      <Section title="Akun saya">
+      <Section title="Akun saya" action={active.length ? <Link href="/keuangan/cocokkan" className="btn">Cocokkan saldo</Link> : undefined}>
         {active.length ? (
           <div className="card rows overflow-hidden">
             {active.map((a) => <AccountRow key={a.id} account={a} change={accountChange(a.id, monthTxs)} href={`/keuangan/akun/${a.id}`} />)}
@@ -173,12 +173,12 @@ async function Rencana({ categories, accounts, today }: { categories: Category[]
   const receivable = debts.filter((d) => d.direction === 'receivable' && d.amount > d.paid_amount);
   const payable = debts.filter((d) => d.direction === 'payable' && d.amount > d.paid_amount);
   const plans = [
-    ...goals.map((g) => ({ id: g.id, title: g.name, ratio: g.target_amount ? g.saved_amount / g.target_amount : 0,
+    ...goals.map((g) => ({ id: g.id, href: `/catat/tabungan/${g.id}`, title: g.name, ratio: g.target_amount ? g.saved_amount / g.target_amount : 0,
       detail: `${formatRpShort(g.saved_amount)} dari ${formatRpShort(g.target_amount)}${g.deadline ? ` · tenggat ${formatDayMonth(g.deadline)}` : ''}` })),
     ...sinking.filter((f) => !f.is_done).map((f) => {
       const months = f.due_on ? Math.max(1, Math.ceil(diffDays(f.due_on, today) / 30)) : 1;
       const perMonth = Math.ceil(Math.max(0, f.amount - f.saved_amount) / months);
-      return { id: f.id, title: f.name, ratio: f.amount ? f.saved_amount / f.amount : 0, detail: `Sisihkan ${formatRpShort(perMonth)}/bulan` };
+      return { id: f.id, href: `/catat/biaya-sejati/${f.id}`, title: f.name, ratio: f.amount ? f.saved_amount / f.amount : 0, detail: `Sisihkan ${formatRpShort(perMonth)}/bulan` };
     }),
   ];
   const activeBills = bills.filter((b) => b.is_active);
@@ -187,46 +187,52 @@ async function Rencana({ categories, accounts, today }: { categories: Category[]
 
   return (
     <>
-      <Section title={`Budget ${formatMonthYear(today).split(' ')[0]}`}>
+      <Section title={`Budget ${formatMonthYear(today).split(' ')[0]}`} action={<Link href="/pengaturan/kategori" className="btn">Atur budget</Link>}>
         {budgets.length ? (
           <div className="card rows overflow-hidden">
             {budgets.map((b) => (
-              <PlanRow key={b.category.id} kind="budget" title={b.category.name} ratio={b.ratio}
+              <PlanRow key={b.category.id} kind="budget" title={b.category.name} ratio={b.ratio} href={`/catat/kategori/${b.category.id}?kembali=/keuangan?tab=rencana`}
                 detail={`${formatRpShort(b.spent)} dari ${formatRpShort(b.budget)}${b.perDayLeft != null ? ` · sisa ${formatRpShort(b.perDayLeft)}/hari` : ''}`} />
             ))}
           </div>
         ) : <div className="card"><EmptyState>Belum ada budget. Atur budget per kategori di Pengaturan, Kategori dan budget.</EmptyState></div>}
       </Section>
-      <Section title="Target tabungan & biaya sejati">
-        {plans.length ? <div className="card rows overflow-hidden">{plans.map((p) => <PlanRow key={p.id} kind="goal" title={p.title} detail={p.detail} ratio={p.ratio} />)}</div>
+      <Section title="Target tabungan & biaya sejati" action={
+        <span className="flex gap-1">
+          <AddButton href="/catat/tabungan" label="Tambah target tabungan" />
+          <Link href="/catat/biaya-sejati" className="btn">+ Biaya sejati</Link>
+        </span>
+      }>
+        {plans.length ? <div className="card rows overflow-hidden">{plans.map((p) => <PlanRow key={p.id} kind="goal" title={p.title} detail={p.detail} ratio={p.ratio} href={p.href} />)}</div>
           : <div className="card"><EmptyState>Belum ada target tabungan atau biaya sejati.</EmptyState></div>}
       </Section>
-      <Section title="Tagihan">
+      <Section title="Tagihan" add={{ href: '/catat/tagihan', label: 'Tambah tagihan' }}>
         {activeBills.length ? (
           <div className="card rows overflow-hidden">
             {activeBills.map((b) => {
               const d = b.next_due_date ? diffDays(b.next_due_date, today) : null;
               const when = d == null ? '' : d < 0 ? `lewat ${-d} hari` : d === 0 ? 'hari ini' : `${d} hari lagi`;
               return (
-                <div key={b.id} className="flex min-h-[56px] items-center gap-3 px-4 py-2.5">
-                  <span className="min-w-0 flex-1">
+                <div key={b.id} className="flex min-h-[56px] items-center gap-2 py-1 pl-4 pr-2">
+                  <Link href={`/catat/tagihan/${b.id}`} className="min-w-0 flex-1 py-1.5 hover:text-accent">
                     <span className="block text-[14px] font-semibold">{b.name}</span>
                     <span className={`block text-[12px] ${d != null && d < 0 ? 'text-negative' : 'text-muted'}`}>
                       {[b.next_due_date ? `${formatDayMonth(b.next_due_date)} · ${when}` : '', b.default_account_id ? acc.get(b.default_account_id) : 'akun belum diatur'].filter(Boolean).join(' · ')}
                     </span>
-                  </span>
+                  </Link>
                   <span className="num text-[14px] font-bold">{formatRp(b.amount)}</span>
+                  <Link href={`/keuangan/tagihan/${b.id}/bayar`} className="inline-flex min-h-11 items-center rounded-[10px] border border-line px-3 text-[12px] font-semibold text-accent">Bayar</Link>
                 </div>
               );
             })}
           </div>
         ) : <div className="card"><EmptyState>Belum ada tagihan.</EmptyState></div>}
       </Section>
-      <Section title={`Piutang · ${receivable.length} orang`}>
+      <Section title={`Piutang · ${receivable.length} orang`} add={{ href: '/catat/utang', label: 'Tambah utang atau piutang' }}>
         <div className="card rows overflow-hidden">
-          {receivable.length ? receivable.map((d) => <PersonRow key={d.id} name={d.person} detail={debtDetail(d)} amount={d.amount - d.paid_amount} />)
+          {receivable.length ? receivable.map((d) => <PersonRow key={d.id} name={d.person} detail={debtDetail(d)} amount={d.amount - d.paid_amount} href={`/catat/utang/${d.id}`} action={{ href: `/keuangan/utang/${d.id}/bayar`, label: 'Terima' }} />)
             : <EmptyState>Tidak ada piutang.</EmptyState>}
-          {payable.length ? payable.map((d) => <PersonRow key={d.id} name={d.person} detail={`Utang · ${debtDetail(d)}`} amount={d.amount - d.paid_amount} />)
+          {payable.length ? payable.map((d) => <PersonRow key={d.id} name={d.person} detail={`Utang · ${debtDetail(d)}`} amount={d.amount - d.paid_amount} href={`/catat/utang/${d.id}`} action={{ href: `/keuangan/utang/${d.id}/bayar`, label: 'Bayar' }} />)
             : <p className="px-4 py-3 text-[12px] text-muted">Utang: tidak ada</p>}
         </div>
       </Section>
@@ -248,16 +254,16 @@ async function Investasi({ accounts }: { accounts: Account[] }) {
         {invAccounts.length ? <div className="card rows overflow-hidden">{invAccounts.map((a) => <Link key={a.id} href={`/keuangan/akun/${a.id}`} className="flex min-h-[56px] items-center justify-between px-4 hover:bg-bg"><span className="text-[14px] font-semibold">{a.name}</span><Balance value={a.balance} className="text-[14px] font-bold" /></Link>)}</div>
           : <div className="card"><EmptyState>Belum ada akun investasi.</EmptyState></div>}
       </Section>
-      <Section title="Instrumen">
+      <Section title="Instrumen" add={{ href: '/catat/investasi', label: 'Tambah investasi' }}>
         {investments.length ? (
           <div className="card rows overflow-hidden">
             {investments.map((v) => {
               const gain = v.invested_amount ? ((v.current_value ?? 0) - v.invested_amount) / v.invested_amount : null;
               return (
-                <div key={v.id} className="flex min-h-[56px] items-center gap-3 px-4 py-2.5">
+                <Link key={v.id} href={`/catat/investasi/${v.id}`} className="flex min-h-[56px] items-center gap-3 px-4 py-2.5 hover:bg-bg">
                   <span className="min-w-0 flex-1"><span className="block text-[14px] font-semibold">{v.name}</span><span className="block text-[12px] text-muted">{[v.instrument, v.platform].filter(Boolean).join(' · ')}</span></span>
                   <span className="text-right"><Balance value={v.current_value ?? 0} className="block text-[14px] font-bold" />{gain != null && <span className={`num block text-[12px] font-semibold ${gain >= 0 ? 'text-positive' : 'text-negative'}`}>{gain >= 0 ? '▲' : '▼'} {Math.abs(Math.round(gain * 1000) / 10).toString().replace('.', ',')}%</span>}</span>
-                </div>
+                </Link>
               );
             })}
           </div>

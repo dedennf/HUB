@@ -64,6 +64,9 @@ export const getTasks = (s: Db) =>
   rows<T.Task>(s.from('tasks').select('id,course_id,parent_id,title,kind,priority,due_at,status,description').order('due_at', { nullsFirst: false }));
 export const getWorkSlots = (s: Db) =>
   rows<T.TaskWorkSlot>(s.from('task_work_slots').select('id,task_id,start_at,end_at').order('start_at'));
+export type MaterialRow = { id: string; course_id: string | null; title: string; url: string | null; meeting: number | null; kind: string | null };
+export const getMaterials = (s: Db) =>
+  rows<MaterialRow>(s.from('materials').select('id,course_id,title,url,meeting,kind').order('meeting', { nullsFirst: false }).order('created_at'));
 export const getHolidays = (s: Db) =>
   rows<T.Holiday>(s.from('holidays').select('id,name,start_date,end_date').order('start_date'));
 export const getEvents = (s: Db) =>

@@ -5,7 +5,13 @@ import { createLocalFlag } from '@/lib/local-flag';
 const collapsedFlag = createLocalFlag('kompas-ra-collapsed');
 const DESKTOP = '(min-width: 64rem)';
 
+export type RaMessage =
+  | { id: string; from: 'user'; text: string }
+  | { id: string; from: 'ra'; text: string; lines?: string[]; proposals?: import('@/app/(dashboard)/ra-actions').ProposalView[]; status?: 'pending' | 'approved' | 'cancelled' | 'undone' };
+
 type Ctx = {
+  messages: RaMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<RaMessage[]>>;
   sheetOpen: boolean;
   openRa: () => void;
   closeSheet: () => void;
@@ -21,6 +27,7 @@ const RaContext = createContext<Ctx | null>(null);
  */
 export function RaProvider({ children }: { children: ReactNode }) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [messages, setMessages] = useState<RaMessage[]>([]);
   const panelCollapsed = useSyncExternalStore(collapsedFlag.subscribe, collapsedFlag.get, collapsedFlag.getServer);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const setPanelCollapsed = useCallback((v: boolean) => collapsedFlag.set(v), []);
@@ -46,7 +53,7 @@ export function RaProvider({ children }: { children: ReactNode }) {
   }, [openRa]);
 
   return (
-    <RaContext value={{ sheetOpen, openRa, closeSheet: () => setSheetOpen(false), panelCollapsed, setPanelCollapsed, inputRef }}>
+    <RaContext value={{ messages, setMessages, sheetOpen, openRa, closeSheet: () => setSheetOpen(false), panelCollapsed, setPanelCollapsed, inputRef }}>
       {children}
     </RaContext>
   );
