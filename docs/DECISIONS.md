@@ -355,3 +355,45 @@ Nominal boleh dikirim sebagai teks rupiah ("30rb") dan dikonversi ke integer. Wa
 - Akun yang tidak disebut: akun yang paling sering dipakai untuk kategori itu (SPEC 6.5), ditandai `doubtful: ['account']` untuk kartu kuning.
 - Mata kuliah semester aktif diutamakan. Proyek riset yang tidak disebut memakai proyek aktif pertama.
 - Ra pengurai lokal (D-32) kini menyimpan lewat registry yang sama, sehingga transaksi yang disetujui tercatat dengan `source = 'agent'`. Dari klien, `undoRa` hanya menerima operasi hapus. Undo yang lebih luas berjalan dari payload tersimpan di server pada Fase 3.
+
+---
+
+# Keputusan Fase 3 · Inti Agen dan Input Teks
+
+## D-38 · Antarmuka model dan SDK Gemini
+**Status: Diputuskan**
+
+Loop agen (`lib/agent/core.ts`) bicara ke antarmuka `AgentModel` (`lib/agent/model.ts`), bukan langsung ke SDK. Implementasi produksinya `GeminiModel` memakai `@google/genai` dengan pemanggilan fungsi manual (`automaticFunctionCalling` dimatikan), karena tool tulis tidak boleh dijalankan sebelum pengguna setuju. Uji memakai model tiruan dengan antarmuka yang sama.
+
+- `GEMINI_API_KEY` dan `GEMINI_MODEL` wajib. Nama model sengaja tidak ditulis di kode supaya bisa diganti dari Vercel tanpa deploy ulang kode.
+- `GEMINI_BASE_URL` hanya untuk uji e2e dengan server Gemini tiruan. Jangan diisi di production.
+- Konten giliran model disimpan utuh di `agent_messages` (termasuk `thoughtSignature`), supaya riwayat tetap sah untuk Gemini di giliran berikutnya. Riwayat yang dikirim dibatasi 16 pesan terakhir.
+
+## D-39 · Usulan, konfirmasi, dan undo
+**Status: Diputuskan**
+
+- Setiap panggilan tool tulis menjadi baris `agent_actions` berstatus `proposed`. `args` berisi argumen yang sudah diresolusi, `result` menyimpan `original_args`, `doubtful`, `warning`, dan `followups`. Gemini menerima `{status: 'menunggu_konfirmasi', action_id, summary}`.
+- `edits` di `/api/agent/confirm` memakai nama argumen tool (`category`, `account`, `occurred_at`, `from_account`, `to_account`, `course`, `due_at`) dengan nilai id atau tanggal. Server menggabungkannya ke `original_args`, menjalankan `prepare` ulang, baru `commit`. Jadi validasi dan resolusi tetap lewat registry.
+- SPEC 6.3 meminta eksekusi "di dalam transaksi database". Registry berjalan lewat PostgREST yang tidak punya transaksi lintas permintaan, jadi "Setujui semua" dijalankan berurutan dan bila satu gagal, semua yang sudah jalan di batch itu dibalik memakai undo payload. Hasil akhirnya sama: semua tersimpan atau tidak ada.
+- Undo selalu memakai `undo_payload` yang tersimpan di server, baik dari toast maupun dari Log Agen (`/pengaturan/log-agen`). Klien hanya mengirim id aksi. `undoRa` lama dan server action `ra-actions.ts` dihapus.
+- Usulan yang belum diputuskan ketika pengguna mengirim pesan baru otomatis ditolak.
+- Respons `/api/agent` mengikuti SPEC 6.1 (`proposed_actions`, `english_feedback`) dan menambah `lookups` (daftar akun, kategori, mata kuliah untuk pilihan chip), `lines`, serta `offline`.
+
+## D-40 · Belajar dari koreksi
+**Status: Diputuskan**
+
+Saat pengguna mengganti chip sebelum menyetujui:
+- Kategori transaksi berubah: `merchant_rule` dengan kunci merchant atau catatan pendek (maksimal 3 kata) → `{category_id}`.
+- Akun transaksi berubah: `correction` dengan kunci yang sama → `{account_id}`. `add_transaction` memakai koreksi ini sebagai akun bawaan bila akun tidak disebut, sebelum tebakan "akun paling sering".
+- Mata kuliah tugas berubah: `alias` dari teks mata kuliah yang disebut → `{course_id}`. `resolveCourse` kini membaca memori alias.
+
+Memori yang sama diperbarui, bukan diduplikasi. Nilai sama menaikkan `confidence` 0,1 (maksimal 1), nilai berbeda mengembalikannya ke 0,7. `last_used_at` diperbarui saat memori dipakai di konteks. Aturan merchant kini dicocokkan sebagai kata utuh di merchant atau catatan.
+
+Tebakan kategori dari kata lepas di catatan dipersempit: hanya kata minimal 4 huruf yang sama persis dengan nama atau kata kunci kategori. Sebelumnya "pak" di "titip pak ujang" ikut cocok ke "Pulsa & internet" lewat kata kunci "paket".
+
+## D-41 · Cadangan saat Gemini tidak tersedia
+**Status: Diputuskan**
+
+Bila Gemini belum diatur atau gagal (kuota, timeout, ditolak, jaringan), `/api/agent` memakai pengurai lokal (D-32). Hasil pengurai diubah menjadi panggilan tool lalu disimpan sebagai `agent_actions` biasa, jadi kartu, konfirmasi, undo, dan Log Agen identik dengan jalur Gemini. Klien menampilkan `OfflineBanner` dengan alasannya. Slot "kerjakan" dari pengurai disimpan sebagai `followups` dan dijalankan setelah tugasnya tersimpan.
+
+Batas laju 30 pesan per menit dihitung dari `agent_messages` peran `user`. `agent_max_steps` dibaca dari tabel settings (bawaan 6, maksimal 12).

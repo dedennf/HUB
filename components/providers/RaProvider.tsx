@@ -1,5 +1,6 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
+import type { CardView, Lookups } from '@/lib/agent/cards';
 import { createLocalFlag } from '@/lib/local-flag';
 
 const collapsedFlag = createLocalFlag('kompas-ra-collapsed');
@@ -7,11 +8,19 @@ const DESKTOP = '(min-width: 64rem)';
 
 export type RaMessage =
   | { id: string; from: 'user'; text: string }
-  | { id: string; from: 'ra'; text: string; lines?: string[]; proposals?: import('@/app/(dashboard)/ra-actions').ProposalView[]; status?: 'pending' | 'approved' | 'cancelled' | 'undone' };
+  | {
+    id: string; from: 'ra'; text: string; lines?: string[]; offline?: string | null;
+    actions?: CardView[]; lookups?: Lookups; edits?: CardEdits;
+    status?: 'pending' | 'approved' | 'cancelled' | 'undone';
+  };
+/** Ubahan chip per aksi: field → nilai baru (id atau tanggal) dan label tampilannya. */
+export type CardEdits = Record<string, Record<string, { value: string; label: string }>>;
 
 type Ctx = {
   messages: RaMessage[];
   setMessages: React.Dispatch<React.SetStateAction<RaMessage[]>>;
+  conversationId: string | null;
+  setConversationId: (id: string | null) => void;
   sheetOpen: boolean;
   openRa: () => void;
   closeSheet: () => void;
@@ -23,11 +32,12 @@ const RaContext = createContext<Ctx | null>(null);
 
 /**
  * Status Ra: sheet di HP, panel kanan di laptop. Ctrl+K / Cmd+K membuka Ra dan memfokuskan inputnya.
- * Ra belum tersambung ke Gemini (Fase 3), jadi isinya masih "Ra segera hadir".
+ * Percakapan (pesan dan id percakapan di server) disimpan di sini supaya sama di panel dan sheet.
  */
 export function RaProvider({ children }: { children: ReactNode }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [messages, setMessages] = useState<RaMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const panelCollapsed = useSyncExternalStore(collapsedFlag.subscribe, collapsedFlag.get, collapsedFlag.getServer);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const setPanelCollapsed = useCallback((v: boolean) => collapsedFlag.set(v), []);
@@ -53,7 +63,7 @@ export function RaProvider({ children }: { children: ReactNode }) {
   }, [openRa]);
 
   return (
-    <RaContext value={{ messages, setMessages, sheetOpen, openRa, closeSheet: () => setSheetOpen(false), panelCollapsed, setPanelCollapsed, inputRef }}>
+    <RaContext value={{ messages, setMessages, conversationId, setConversationId, sheetOpen, openRa, closeSheet: () => setSheetOpen(false), panelCollapsed, setPanelCollapsed, inputRef }}>
       {children}
     </RaContext>
   );

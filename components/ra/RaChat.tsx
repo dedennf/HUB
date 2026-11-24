@@ -1,57 +1,79 @@
 'use client';
-import { ArrowLeftRight, CalendarCheck, CalendarDays, ClipboardList, Lightbulb, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition, type RefObject } from 'react';
-import { approveRa, askRa, undoRa, type ProposalView } from '@/app/(dashboard)/ra-actions';
-import type { UndoPayload } from '@/lib/agent/tools/types';
+import { confirmActions, sendToRa, undoActions } from '@/lib/agent/client';
 import { useRa, type RaMessage } from '@/components/providers/RaProvider';
 import { ActionBar } from './ActionBar';
-import { ActionCard } from './ActionCard';
 import { ChatBubble } from './ChatBubble';
+import { OfflineBanner } from './OfflineBanner';
+import { ProposalCard } from './ProposalCard';
 import { RaInputBar } from './RaInputBar';
 import { RaAvatar } from './RaMark';
 import { UndoToast } from './UndoToast';
 
-const ICON: Record<ProposalView['icon'], LucideIcon> = {
-  expense: TrendingDown, income: TrendingUp, transfer: ArrowLeftRight, task: CalendarCheck, event: CalendarDays, idea: Lightbulb, need: ClipboardList,
-};
-const TONE: Record<ProposalView['icon'], 'expense' | 'income' | 'task' | 'neutral'> = {
-  expense: 'expense', income: 'income', transfer: 'neutral', task: 'task', event: 'neutral', idea: 'neutral', need: 'neutral',
-};
-const EXAMPLES = ['kopi 18rb dana', 'tugas laporan jumat 23.59', 'rapat besok jam 14 di perpus', 'saldo berapa?'];
+const EXAMPLES = ['tadi beli bensin 30rb pakai gopay', 'tugas laporan RDTR dikumpul jumat jam 23.59', 'pindahin 500rb dari BCA ke Dana', 'sisa uang di semua akun berapa'];
 
 const uid = () => Math.random().toString(36).slice(2);
+type RaMsg = Extract<RaMessage, { from: 'ra' }>;
 
-/** Percakapan Ra memakai pengurai lokal (D-32). Dipakai panel laptop dan sheet HP. */
+/** Percakapan Ra (SPEC 6.2 dan 6.3). Dipakai panel laptop dan sheet HP. */
 export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<HTMLInputElement | null>; showCamera?: boolean }) {
-  const { messages, setMessages } = useRa();
+  const { messages, setMessages, conversationId, setConversationId } = useRa();
+  const router = useRouter();
   const [pending, start] = useTransition();
-  const [toast, setToast] = useState<{ text: string; undo: UndoPayload; msgId: string } | null>(null);
+  const [toast, setToast] = useState<{ text: string; ids: string[]; msgId: string } | null>(null);
   const [undoing, setUndoing] = useState(false);
+  // simpan terpisah dari transisi kirim, supaya input tidak terkunci selama halaman disegarkan
+  const [saving, setSaving] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [messages.length, pending]);
 
+  const say = (text: string, extra: Partial<RaMsg> = {}) => setMessages((m) => [...m, { id: uid(), from: 'ra', text, ...extra }]);
+  const update = (id: string, patch: Partial<RaMsg> | ((x: RaMsg) => Partial<RaMsg>)) =>
+    setMessages((m) => m.map((x) => (x.id === id && x.from === 'ra' ? { ...x, ...(typeof patch === 'function' ? patch(x) : patch) } : x)));
+
   const send = (text: string) => {
+    // usulan lama yang belum diputuskan dianggap batal (server juga menolaknya)
+    const stale = messages.filter((x): x is RaMsg => x.from === 'ra' && x.status === 'pending').flatMap((x) => (x.actions ?? []).map((a) => a.id));
+    if (stale.length) void confirmActions(stale, 'reject').catch(() => {});
     setMessages((m) => [...m.map((x) => (x.from === 'ra' && x.status === 'pending' ? { ...x, status: 'cancelled' as const } : x)), { id: uid(), from: 'user', text }]);
     start(async () => {
       try {
-        const r = await askRa(text);
-        setMessages((m) => [...m, { id: uid(), from: 'ra', text: r.reply, lines: r.lines, proposals: r.proposals, status: r.proposals.length ? 'pending' : undefined }]);
-      } catch {
-        setMessages((m) => [...m, { id: uid(), from: 'ra', text: 'Ra sedang tidak tersambung ke server. Coba lagi sebentar lagi.' }]);
+        const r = await sendToRa(text, conversationId);
+        setConversationId(r.conversation_id);
+        say(r.reply, { lines: r.lines, actions: r.proposed_actions, lookups: r.lookups, offline: r.offline, edits: {}, status: r.proposed_actions.length ? 'pending' : undefined });
+      } catch (e) {
+        say((e as Error).message.startsWith('Terlalu banyak') ? (e as Error).message : 'Ra sedang tidak tersambung ke server. Coba lagi sebentar lagi.');
       }
     });
   };
 
-  const update = (id: string, patch: Partial<Extract<RaMessage, { from: 'ra' }>>) =>
-    setMessages((m) => m.map((x) => (x.id === id && x.from === 'ra' ? { ...x, ...patch } : x)));
+  const approve = async (msg: RaMsg) => {
+    if (saving) return;
+    setSaving(true);
+    const ids = (msg.actions ?? []).map((a) => a.id);
+    const edits = Object.fromEntries(Object.entries(msg.edits ?? {}).map(([id, f]) => [id, Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.value]))]));
+    try {
+      const r = await confirmActions(ids, 'approve', edits);
+      if (!r.ok) { say(r.message); return; }
+      update(msg.id, { status: 'approved' });
+      setToast({ text: r.message, ids: r.executed, msgId: msg.id });
+      router.refresh();
+    } catch {
+      say('Gagal menyimpan. Cek koneksi lalu coba lagi.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  const approve = (msg: Extract<RaMessage, { from: 'ra' }>) => start(async () => {
-    const r = await approveRa((msg.proposals ?? []).map((p) => p.proposal));
-    if (!r.ok) { setMessages((m) => [...m, { id: uid(), from: 'ra', text: r.message }]); return; }
-    update(msg.id, { status: 'approved' });
-    setToast({ text: r.message, undo: r.undo, msgId: msg.id });
-  });
+  const reject = (msg: RaMsg, ids = (msg.actions ?? []).map((a) => a.id)) => {
+    void confirmActions(ids, 'reject').catch(() => {});
+    update(msg.id, (x) => {
+      const rest = (x.actions ?? []).filter((a) => !ids.includes(a.id));
+      return rest.length ? { actions: rest } : { status: 'cancelled' };
+    });
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -60,7 +82,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
           <div className="flex flex-col items-center gap-3 px-2 py-6 text-center">
             <RaAvatar size={44} />
             <p className="font-display text-[16px] font-bold">Catat apa hari ini?</p>
-            <p className="max-w-72 text-[13px] text-muted">Ra belum tersambung ke Gemini, jadi perintah dibaca pengurai lokal. Bisa transaksi, tugas, acara, ide, dan pertanyaan saldo. Tidak ada yang tersimpan sebelum kamu setujui.</p>
+            <p className="max-w-72 text-[13px] text-muted">Tulis seperti chat biasa. Transaksi, tugas, transfer, atau pertanyaan saldo. Tidak ada yang tersimpan sebelum kamu setujui.</p>
             <div className="flex flex-wrap justify-center gap-2">
               {EXAMPLES.map((e) => (
                 <button key={e} type="button" onClick={() => send(e)} className="min-h-11 rounded-xl border border-line bg-surface px-3 text-[12px] text-fg hover:border-accent">{e}</button>
@@ -71,20 +93,22 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
           <div className="flex flex-col gap-3 pt-3">
             {messages.map((m) => m.from === 'user' ? <ChatBubble key={m.id} from="user">{m.text}</ChatBubble> : (
               <div key={m.id} className="flex flex-col gap-2.5">
-                <ChatBubble from="ra">{m.text}</ChatBubble>
+                {m.offline && <OfflineBanner reason={m.offline} />}
+                <ChatBubble from="ra"><span className="whitespace-pre-line">{m.text}</span></ChatBubble>
                 {m.lines && <ul className="card rows overflow-hidden text-[13px]">{m.lines.map((l, i) => <li key={i} className="px-4 py-2.5">{l}</li>)}</ul>}
-                {m.proposals && m.proposals.length > 0 && m.status !== 'cancelled' && (
+                {m.actions && m.actions.length > 0 && m.status !== 'cancelled' && (
                   <div className={`flex flex-col gap-2.5 ${m.status === 'pending' ? '' : 'opacity-60'}`}>
-                    {m.proposals.map((p) => (
-                      <ActionCard key={p.key} icon={ICON[p.icon]} tone={TONE[p.icon]} kindLabel={p.kindLabel} value={p.value} chips={p.chips} note={p.note}
-                        onRemove={m.status === 'pending' ? () => {
-                          const rest = (m.proposals ?? []).filter((x) => x.key !== p.key);
-                          update(m.id, rest.length ? { proposals: rest } : { proposals: rest, status: 'cancelled' });
-                        } : undefined} />
+                    {m.actions.map((a) => (
+                      <ProposalCard key={a.id} card={a} lookups={m.lookups} edits={m.edits?.[a.id]} readOnly={m.status !== 'pending'}
+                        onEdit={(field, e) => update(m.id, (x) => ({ edits: { ...x.edits, [a.id]: { ...x.edits?.[a.id], [field]: e } } }))}
+                        onRemove={() => reject(m, [a.id])} />
                     ))}
-                    {m.status === 'pending' && <ActionBar count={m.proposals.length} disabled={pending} onCancel={() => update(m.id, { status: 'cancelled' })} onApprove={() => approve(m)} />}
-                    {m.status === 'approved' && <p className="text-[12px] font-semibold text-positive">Disimpan.</p>}
-                    {m.status === 'undone' && <p className="text-[12px] text-muted">Dibatalkan, tidak ada yang tersimpan.</p>}
+                    {m.status === 'pending' && (
+                      <ActionBar count={m.actions.length} disabled={pending || saving} destructive={m.actions.some((a) => a.destructive)}
+                        onCancel={() => reject(m)} onApprove={() => approve(m)} />
+                    )}
+                    {m.status === 'approved' && <p className="text-[12px] font-semibold text-positive">Disimpan. Riwayatnya ada di Log Agen.</p>}
+                    {m.status === 'undone' && <p className="text-[12px] text-muted">Dibatalkan, data dikembalikan.</p>}
                   </div>
                 )}
                 {m.status === 'cancelled' && <p className="text-[12px] text-muted">Tidak disimpan.</p>}
@@ -100,10 +124,11 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
         <UndoToast key={toast.msgId} message={toast.text} undoing={undoing} onDone={() => setToast(null)}
           onUndo={async () => {
             setUndoing(true);
-            await undoRa(toast.undo);
-            update(toast.msgId, { status: 'undone' });
+            const r = await undoActions(toast.ids).catch(() => ({ ok: false, message: 'Gagal membatalkan.' }));
+            if (r.ok) update(toast.msgId, { status: 'undone' }); else say(r.message);
             setUndoing(false);
             setToast(null);
+            router.refresh();
           }} />
       )}
     </div>

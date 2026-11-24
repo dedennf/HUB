@@ -1,6 +1,6 @@
 import { TriangleAlert } from 'lucide-react';
 
-/** Ra tidak tersambung (kuota habis, jaringan). */
+/** Ra tidak tersambung ke Gemini (kuota habis, belum diatur, jaringan): perintah dibaca pengurai lokal. */
 export function OfflineBanner({ reason = 'kuota habis' }: { reason?: string }) {
   return (
     <div role="alert" className="flex gap-3 rounded-2xl border border-warn-fg/30 bg-warn-bg p-3 text-[13px] text-warn-fg">

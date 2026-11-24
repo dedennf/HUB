@@ -26,6 +26,10 @@ Salin `.env.example` ke `.env.local` untuk lokal, dan isi yang sama di Vercel (S
 | `SUPABASE_SERVICE_ROLE_KEY` | service role atau secret key (belum dipakai di Fase 1, disiapkan untuk cron) |
 | `OWNER_EMAIL` | email pemilik, satu-satunya yang boleh login |
 | `APP_TIMEZONE` | `Asia/Jakarta` |
+| `GEMINI_API_KEY` | kunci API dari Google AI Studio, untuk Ra (Fase 3) |
+| `GEMINI_MODEL` | nama model Gemini yang dipakai Ra, misalnya model Flash terbaru yang tersedia di akunmu |
+
+Tanpa dua variabel Gemini, Ra tetap jalan memakai pengurai lokal dan menampilkan banner "Gemini belum diatur".
 
 ## Perintah
 
