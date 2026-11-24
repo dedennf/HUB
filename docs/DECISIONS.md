@@ -466,3 +466,14 @@ Rincian:
 - **Saat Gemini tidak tersedia**: pengurai lokal tidak bisa mendengar. Ra menjawab dengan banner offline dan meminta pengguna mengetik. Tidak ada usulan yang dibuat.
 - **Dikte bawaan browser** (opsi di SPEC 7.3) tidak ditambahkan. Keyboard HP sudah punya tombol dikte sendiri.
 - **Belum teruji di perangkat asli**: Safari iPhone dan Chrome Android. Uji otomatis memakai Chromium dengan mikrofon palsu di ukuran laptop dan HP.
+
+## D-48 · Pesan suara: transkripsi dulu, lalu loop agen biasa
+**Status: Diputuskan** (mengganti bagian "Transkrip" di D-47)
+
+Di production pesan suara berhenti di batas waktu 40 detik ("Gemini terlalu lama menjawab"). Penyebabnya, versi D-47 mengirim audio di giliran pengguna, sehingga audio ikut terkirim ulang di setiap langkah loop agen (biasanya 2 sampai 3 langkah), selalu bersama 38 deklarasi tool.
+
+Sekarang audio diproses dua tahap, keduanya oleh Gemini:
+1. **Transkripsi** (`lib/agent/voice.ts`): satu panggilan dengan audio sebagai inline data, tanpa tool, output JSON `{transcript, clear}`, tingkat berpikir `minimal`. Rekaman sunyi atau tidak jelas → Ra meminta mengulang, tidak ada usulan.
+2. **Loop agen biasa** dengan teks `[pesan suara] <transkrip>`. Konteks sistem memberi tahu bahwa teks itu transkrip otomatis yang mungkin salah dengar.
+
+Klien tetap mengirim audio mentah dan tidak ada speech-to-text di perangkat (SPEC 7.3). Yang berubah hanya urutan di server: Gemini menulis ucapan dulu, baru memahami dan memanggil tool, alih-alih keduanya dalam satu giliran. Aturan "Transkrip:" di jawaban akhir dihapus. Transkrip lebih andal karena tidak bergantung format jawaban model. `/api/agent/diagnose` menambah uji transkripsi audio 1 detik untuk mengukur waktunya di production.

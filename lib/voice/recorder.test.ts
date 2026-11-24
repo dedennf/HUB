@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { splitTranscript } from '@/lib/agent/core';
 import { encodeWav, pickMime } from './recorder';
 
 describe('pickMime', () => {
@@ -23,16 +22,5 @@ describe('encodeWav', () => {
     expect(v.getUint16(34, true)).toBe(16);
     expect(v.getUint32(40, true)).toBe(8);
     expect([v.getInt16(46, true), v.getInt16(48, true)]).toEqual([32767, -32768]);
-  });
-});
-
-describe('splitTranscript', () => {
-  it('memisahkan baris transkrip dari balasan', () => {
-    expect(splitTranscript('Transkrip: tadi beli bensin 30rb\nOke, cek dulu sebelum disimpan.')).toEqual({ transcript: 'tadi beli bensin 30rb', reply: 'Oke, cek dulu sebelum disimpan.' });
-    expect(splitTranscript('**Transkrip:** "sisa uang berapa"\nTotal Rp1.000.000')).toEqual({ transcript: 'sisa uang berapa', reply: 'Total Rp1.000.000' });
-  });
-  it('tidak jelas atau tanpa transkrip', () => {
-    expect(splitTranscript('Transkrip: (tidak jelas)\nBisa diulang?')).toEqual({ transcript: null, reply: 'Bisa diulang?' });
-    expect(splitTranscript('Oke.')).toEqual({ transcript: null, reply: 'Oke.' });
   });
 });

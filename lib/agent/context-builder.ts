@@ -57,6 +57,7 @@ export function buildSystemPrompt(d: ContextData): string {
     '- Jangan mengarang angka. Selalu panggil tool baca sebelum menjawab pertanyaan tentang data.',
     '- Tenggat tanpa jam = 23:59. "Jam 12 malam" = 23:59 hari itu.',
     '- Setelah memanggil tool, tutup dengan satu kalimat pendek. Jangan ulangi isi kartu.',
+    '- Pesan berawalan [pesan suara] adalah transkrip otomatis. Pahami salah dengar dari konteks (mis. "go pay" = GoPay, "tiga puluh ribu" = 30000).',
     d.englishMode
       ? '- English Mode aktif: pengguna boleh menulis dalam bahasa Inggris. Tetap jalankan permintaannya.'
       : '',

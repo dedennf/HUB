@@ -36,5 +36,7 @@ it('diagnosa memisahkan model penuh dari masalah deklarasi tool', async () => {
   expect(pick('berat', /tanpa tool/)).toMatchObject({ ok: true, reply: 'siap' });
   expect(pick('berat', /tool Ra/)).toMatchObject({ ok: false });
   expect(toolsSeen.berat).toBeGreaterThan(30);
-  expect(r.cases).toHaveLength(5);
+  expect(r.cases).toHaveLength(6);
+  expect(r.cases.at(-1)).toMatchObject({ model: 'penuh', ok: false, reason: 'unavailable' });
+  expect(r.cases.at(-1)!.test).toMatch(/transkripsi/);
 });
