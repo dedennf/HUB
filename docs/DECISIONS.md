@@ -414,3 +414,13 @@ Di production Gemini membalas `504 DEADLINE_EXCEEDED`. SDK mengirim `httpOptions
 - Bila model menolak pengaturan ini (400 yang menyebut thinking), permintaan dikirim ulang tanpa pengaturan itu dan model tersebut diingat selama proses server hidup.
 - Batas per panggilan 25 detik, batas loop tetap 40 detik (D-42).
 - 504 dipetakan ke `timeout` dan tidak dicoba ulang. Hanya 500, 502, dan 503 yang dicoba ulang sekali.
+
+## D-44 · Model cadangan saat Gemini utama penuh
+**Status: Diputuskan**
+
+Production membalas `503` dua kali berturut-turut untuk `gemini-3.8-flash` (model sedang penuh). Kapasitas model ada di sisi Google, jadi Ra diberi jalan keluar:
+
+- `GEMINI_FALLBACK_MODEL` (opsional). Bila model utama membalas 5xx, 504, atau kuota habis, permintaan langsung dikirim ke model cadangan tanpa mencoba ulang model utama, supaya tetap dalam batas waktu 40 detik (D-42).
+- Galat 400, 403, dan 404 (kunci atau nama model salah) tidak dialihkan, supaya salah konfigurasi tetap kelihatan.
+- Tanpa model cadangan, perilaku lama berlaku: coba ulang sekali untuk 500, 502, dan 503.
+- Pengalihan dicatat di log `[agent] ... pindah ke model cadangan`.
