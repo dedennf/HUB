@@ -12,6 +12,7 @@ import { RaInputBar } from './RaInputBar';
 import { RaAvatar } from './RaMark';
 import { ReceiptScanning } from './ReceiptScanning';
 import { RecordingView } from './RecordingView';
+import { EnglishFeedbackNote } from './EnglishFeedbackNote';
 import { UndoToast } from './UndoToast';
 
 const EXAMPLES = ['tadi beli bensin 30rb pakai gopay', 'tugas laporan RDTR dikumpul jumat jam 23.59', 'pindahin 500rb dari BCA ke Dana', 'sisa uang di semua akun berapa'];
@@ -45,7 +46,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
       try {
         const r = await sendToRa(text, conversationId);
         setConversationId(r.conversation_id);
-        say(r.reply, { lines: r.lines, actions: r.proposed_actions, lookups: r.lookups, offline: r.offline, edits: {}, status: r.proposed_actions.length ? 'pending' : undefined });
+        say(r.reply, { lines: r.lines, actions: r.proposed_actions, lookups: r.lookups, offline: r.offline, edits: {}, englishFeedback: r.english_feedback, status: r.proposed_actions.length ? 'pending' : undefined });
       } catch (e) {
         say(e instanceof ApiFailure ? e.message : 'Ra sedang tidak tersambung ke server. Coba lagi sebentar lagi.');
       }
@@ -110,6 +111,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
               <div key={m.id} className="flex flex-col gap-2.5">
                 {m.offline && <OfflineBanner reason={m.offline} />}
                 <ChatBubble from="ra"><span className="whitespace-pre-line">{m.text}</span></ChatBubble>
+                {m.englishFeedback && <EnglishFeedbackNote fb={m.englishFeedback} />}
                 {m.lines && <ul className="card rows overflow-hidden text-[13px]">{m.lines.map((l, i) => <li key={i} className="px-4 py-2.5">{l}</li>)}</ul>}
                 {m.links && m.links.map((l) => (
                   <Link key={l.href} href={l.href} className="inline-flex min-h-11 items-center text-[13px] font-semibold text-accent underline-offset-2 hover:underline">{l.label}</Link>

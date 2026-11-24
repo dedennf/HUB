@@ -805,13 +805,13 @@ Setiap fase selesai jika semua kriteria terpenuhi, build lolos, dan preview Verc
 - [x] Halaman Otomasi dengan riwayat jalan
 - [x] Jam tenang dihormati (ditunda ke akhir jam tenang, tenggat di dalam jam tenang tetap langsung)
 
-**Fase 7 · Bahasa Inggris**
-- [ ] Bank kosakata + review SM-2
-- [ ] Membaca berpendamping dari modul Riset
-- [ ] Koreksi tulisan + `mistake_patterns`
-- [ ] Latihan bicara tingkat 1
-- [ ] English Mode di AgentBar
-- [ ] Otomasi review kosakata dan konten bahasa di briefing
+**Fase 7 · Bahasa Inggris** (D-53 sampai D-55)
+- [x] Bank kosakata + review SM-2 (`/bahasa`, `/bahasa/kata`, isi otomatis dengan Ra)
+- [x] Membaca berpendamping dari modul Riset (`/bahasa/baca?bacaan=id`, tombol "Baca dengan Ra" di daftar literatur)
+- [x] Koreksi tulisan + `mistake_patterns` (`/bahasa/tulis`, jenis kesalahan baku)
+- [x] Latihan bicara tingkat 1 (`/bahasa/bicara`, catatan bahwa penilaian pelafalan kasar)
+- [x] English Mode di AgentBar (sakelar di Ra, umpan balik di bawah balasan, tersimpan sebagai `english_mode`)
+- [x] Otomasi review kosakata dan konten bahasa di briefing (kata hari ini di briefing pagi)
 
 **Fase 8 · Suara Tingkat 2 (Live API)**
 - [ ] Token sementara dari server, klien tersambung langsung

@@ -523,3 +523,30 @@ Tiga lapis pengaman:
 - Kunci VAPID dibaca saat runtime, bukan `process.env.NEXT_PUBLIC_*` literal yang ditanam Next saat build. Dengan begitu kunci yang diisi setelah build tetap terbaca.
 - Petunjuk iPhone (SPEC 9): Safari baru mendukung push untuk app yang ditambahkan ke Layar Utama. Halaman Notifikasi menampilkan langkahnya bila Safari di iPhone belum dalam mode standalone.
 - Usulan yang menunggu (dari otomasi maupun percakapan yang belum diputuskan, 7 hari terakhir) tampil sebagai kartu di Beranda dengan Setujui dan Tolak, menggantikan banner "N usulan" lama.
+
+---
+
+# Keputusan Fase 7 · Bahasa Inggris
+
+## D-53 · Fitur bahasa memanggil Gemini langsung, bukan lewat loop agen
+**Status: Diputuskan**
+
+Jelaskan, pecah kalimat, isi entri kata, koreksi tulisan, pertanyaan latihan bicara, penilaian bicara, dan umpan balik English Mode memanggil Gemini satu kali dengan output JSON terstruktur (`lib/english/ai.ts`), lalu divalidasi Zod. Tidak lewat loop agen dengan 38 tool, karena lebih cepat, lebih hemat kuota, dan hasilnya terstruktur untuk UI. Tool `correct_writing`, `explain_text`, `start_practice`, dan lainnya tetap ada untuk Ra di chat, dan memakai penyimpanan yang sama (`lib/english/store.ts`).
+
+- Penjelasan untuk pengguna selalu dalam bahasa Indonesia. Teks bahasa Inggris di UI diberi `lang="en"` supaya pembaca layar melafalkannya benar.
+- Jenis kesalahan dibakukan ke 13 kategori (`MISTAKE_TYPES`, mis. "article a/an/the", "subject-verb agreement"), supaya `mistake_patterns` terkumpul rapi dan latihan berikutnya bisa memancing pola yang paling sering salah (SPEC 10.4).
+- Tanpa Gemini, review kartu dan bank kata tetap jalan. Fitur yang butuh Gemini menampilkan alasannya (belum diatur, kuota habis, terlalu lama).
+
+## D-54 · Aksi pengguna di halaman Bahasa langsung tersimpan
+**Status: Diputuskan**
+
+Menilai kartu, menyimpan kata, dan menyimpan hasil koreksi adalah aksi pengguna sendiri di halamannya, bukan usulan Ra. Jadi langsung tersimpan tanpa kartu konfirmasi. Aturan SPEC 6.3 tetap berlaku untuk Ra di chat. Isi yang dibuat Gemini (arti kata, definisi, contoh) selalu tampil di form dulu dan baru tersimpan saat pengguna menekan Simpan.
+
+Sesi latihan dicatat ke `practice_sessions` (review saat dek selesai, baca saat menekan Selesai membaca, tulis setiap koreksi, bicara setiap penilaian). Streak dihitung dari hari yang punya review atau sesi latihan.
+
+## D-55 · English Mode dan latihan bicara
+**Status: Diputuskan**
+
+- English Mode tersimpan di setelan `english_mode`. Saat aktif, `/api/agent` menjalankan loop agen dan pemeriksaan bahasa secara paralel, jadi balasan tidak bertambah lama. Pemeriksaan hanya untuk pesan teks (bukan transkrip suara), menghormati tingkat koreksi (`off`, `important_only`, `all`), dan melewati pesan yang bukan bahasa Inggris. Pesan disimpan sebagai `writing_submissions` kind `english_mode` dan menambah `mistake_patterns`. Bila pemeriksaan gagal, balasan Ra tetap tampil.
+- Latihan bicara tingkat 1 memakai perekam dan pengaman sunyi dari Fase 5 (D-47, D-49). Gemini diminta menulis transkrip apa adanya dan menandai `heard_speech = false` bila tidak ada ucapan. Rekaman tidak disimpan. Transkrip dan skor masuk `practice_sessions.score`. UI menampilkan catatan bahwa penilaian pelafalan bersifat kasar (SPEC 10.2.4).
+- Teks bacaan yang ditempel bisa disimpan ke `readings.content_excerpt`, supaya bacaan dari modul Riset bisa dibuka lagi.

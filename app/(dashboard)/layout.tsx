@@ -18,10 +18,10 @@ import { readTheme } from '@/lib/settings';
  */
 export default async function DashboardLayout({ children }: LayoutProps<'/'>) {
   await requireUser();
-  const settings = await getSettings(await db(), ['theme']);
+  const settings = await getSettings(await db(), ['theme', 'english_mode']);
   return (
     <PrivacyProvider>
-      <RaProvider>
+      <RaProvider englishMode={settings.english_mode === true}>
         <ThemeSync theme={readTheme(settings.theme)} />
         <div className="flex min-h-dvh flex-wrap lg:flex-nowrap">
           <Sidebar />

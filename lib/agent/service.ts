@@ -1,5 +1,7 @@
 // Lapisan yang dipakai route /api/agent*: batas laju, pilih Gemini atau cadangan, susun kartu untuk klien.
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { englishModeFeedback } from '@/lib/english/ai';
+import { loadProfile, saveSubmission } from '@/lib/english/store';
 import { cardFor, type ActionRow, type CardView, type Lookups } from './cards';
 import { ensureConversation, insertMessages, runAgent } from './core';
 import { runFallback } from './fallback';
@@ -8,9 +10,32 @@ import type { ToolCtx } from './tools/types';
 
 export const RATE_LIMIT_PER_MIN = 30;
 
+/** Umpan balik English Mode (SPEC 10.2.5) di bawah balasan Ra. */
+export type EnglishFeedback = { corrected: string; notes: { original: string; fix: string; explanation_id: string }[] };
+
+/**
+ * English Mode: bila aktif dan pesan berbahasa Inggris, Gemini memberi koreksi singkat sesuai tingkat koreksi.
+ * Pesan disimpan sebagai writing_submissions kind english_mode supaya pola kesalahan ikut terlacak.
+ * Gagal di sini tidak menggagalkan balasan Ra.
+ */
+export async function englishFeedbackFor(ctx: ToolCtx, model: AgentModel, text: string, signal?: AbortSignal): Promise<EnglishFeedback | null> {
+  if (!text.trim() || text.startsWith('[pesan suara]')) return null;
+  try {
+    const profile = await loadProfile(ctx.db);
+    if (!profile.mode || profile.correction === 'off') return null;
+    const fb = await englishModeFeedback(model, profile, { text: text.slice(0, 1000) }, signal);
+    if (!fb.is_english) return null;
+    await saveSubmission(ctx.db, { kind: 'english_mode', original: text, corrected: fb.corrected || text, mistakes: fb.notes }, ctx.now);
+    return { corrected: fb.corrected, notes: fb.notes.map(({ original, fix, explanation_id }) => ({ original, fix, explanation_id })) };
+  } catch (e) {
+    console.error('[agent] umpan balik English Mode gagal:', (e as Error).message);
+    return null;
+  }
+}
+
 export type AgentResponse = {
   conversation_id: string; reply: string; lines?: string[]; proposed_actions: CardView[]; lookups: Lookups;
-  offline: string | null; english_feedback: null;
+  offline: string | null; english_feedback: EnglishFeedback | null;
   /** Pesan suara: apa yang didengar Ra (null bila tidak jelas). */
   transcript?: string | null;
 };
@@ -59,9 +84,12 @@ export async function handleMessage(ctx: ToolCtx, model: AgentModel | null, text
     const budget = AbortSignal.timeout(opts.budgetMs ?? AGENT_BUDGET_MS);
     const signal = opts.signal ? AbortSignal.any([opts.signal, budget]) : budget;
     try {
-      const r = await runAgent({ ctx, model, text, conversationId, maxSteps: opts.maxSteps, signal, audio: opts.audio });
+      const [r, english] = await Promise.all([
+        runAgent({ ctx, model, text, conversationId, maxSteps: opts.maxSteps, signal, audio: opts.audio }),
+        opts.audio ? Promise.resolve(null) : englishFeedbackFor(ctx, model, text, signal),
+      ]);
       return {
-        conversation_id: r.conversation_id, reply: r.reply, proposed_actions: await loadCards(ctx.db, r.action_ids, lookups, ctx.today), lookups, offline: null, english_feedback: null,
+        conversation_id: r.conversation_id, reply: r.reply, proposed_actions: await loadCards(ctx.db, r.action_ids, lookups, ctx.today), lookups, offline: null, english_feedback: english,
         ...(opts.audio ? { transcript: r.transcript ?? null } : {}),
       };
     } catch (e) {

@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { review } from '../../english/srs';
 import { addDays, zonedParts, zonedToIso } from '../../time';
+import { saveSubmission } from '../../english/store';
 import { insertRow, isErr } from './common';
 import { fail, type ReadTool, type UndoOp, type WriteTool } from './types';
 
@@ -80,22 +81,8 @@ export const correctWriting: WriteTool<typeof writingParams, z.infer<typeof writ
     return { ok: true, summary: `Koreksi tulisan: ${a.mistakes.length} catatan`, resolved: a };
   },
   async commit(ctx, r) {
-    const sub = await insertRow(ctx, 'writing_submissions', { original: r.text, corrected: r.corrected, kind: r.kind ?? 'free', feedback: { mistakes: r.mistakes, score: r.score ?? null } });
-    if (isErr(sub)) return sub;
-    const ops: UndoOp[] = [sub.undo];
-    const types = [...new Set(r.mistakes.map((m) => m.type.trim().toLowerCase()).filter(Boolean))];
-    for (const t of types) {
-      const example = r.mistakes.find((m) => m.type.trim().toLowerCase() === t)?.original ?? null;
-      const { data: ex } = await ctx.db.from('mistake_patterns').select('id,count,example,last_seen_at').eq('pattern', t).maybeSingle();
-      if (ex) {
-        await ctx.db.from('mistake_patterns').update({ count: ex.count + 1, example, last_seen_at: ctx.now.toISOString() }).eq('id', ex.id);
-        ops.push({ op: 'update', table: 'mistake_patterns', id: ex.id, values: { count: ex.count, example: ex.example, last_seen_at: ex.last_seen_at } });
-      } else {
-        const ins = await insertRow(ctx, 'mistake_patterns', { pattern: t, example, last_seen_at: ctx.now.toISOString() });
-        if (!isErr(ins)) ops.push(ins.undo);
-      }
-    }
-    return { ok: true, data: { id: sub.id }, undo: { ops } };
+    const res = await saveSubmission(ctx.db, { kind: r.kind ?? 'free', original: r.text, corrected: r.corrected, mistakes: r.mistakes, score: r.score ?? null }, ctx.now);
+    return { ok: true, data: { id: res.id }, undo: { ops: res.undo } };
   },
 };
 

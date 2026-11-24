@@ -50,12 +50,14 @@ async function briefing(env: TickEnv): Promise<RunOutput> {
     db.from('accounts').select('name,balance,type').eq('is_archived', false).neq('type', 'investment').then((r) => r.data ?? []),
     db.from('vocab').select('id', { count: 'exact', head: true }).lte('due_at', now.toISOString()).then((r) => r.count ?? 0),
   ]);
+  // satu kosakata hari ini (SPEC 8.5): kata jatuh tempo yang paling lama, atau kata terbaru
+  const { data: word } = await db.from('vocab').select('term,meaning_id').order('due_at').limit(1).maybeSingle();
   const lines = [
     classes.length ? `Kuliah: ${classes.map((c) => `${c.course ?? 'kelas'} ${c.start.replace(':', '.')}`).join(', ')}` : 'Tidak ada kuliah hari ini.',
     tasks.length ? `Tenggat dekat: ${tasks.slice(0, 3).map((t) => `${t.title} (${dayName(zonedParts(t.due_at!).date, today)} ${hm(t.due_at!)})`).join(', ')}` : '',
     bills.length ? `Tagihan: ${bills.map((b) => `${b.name} ${formatRp(b.amount)} ${dayName(b.next_due_date, today)}`).join(', ')}` : '',
     ...accounts.filter((a) => a.balance < 50_000).map((a) => `Saldo ${a.name} tinggal ${formatRp(a.balance)}.`),
-    vocab ? `${vocab} kosakata siap diulang.` : '',
+    word ? `Kata hari ini: ${word.term}${word.meaning_id ? ` (${word.meaning_id})` : ''}${vocab > 1 ? `, plus ${vocab - 1} kata lain siap diulang` : ''}.` : '',
   ].filter(Boolean);
   const n = await env.notify({ title: 'Briefing pagi', body: lines.join('\n'), url: '/', category: 'briefing', dedupe_key: `briefing:${today}` });
   return ok(lines.join(' | '), Number(n));

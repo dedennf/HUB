@@ -64,7 +64,7 @@ export default async function RisetPage() {
           ) : <div className="card"><EmptyState>Belum ada target riset.</EmptyState></div>}
         </Section>
         <Section title="Literatur" add={{ href: `/catat/literatur${K}${pid}`, label: 'Tambah literatur' }}>
-          {readings.length ? <div className="card rows overflow-hidden">{readings.map((r) => <LiteratureRow key={r.id} title={r.title} authors={r.authors} year={r.year} doi={r.doi} status={r.verification_status} href={`/catat/literatur/${r.id}${K}`} />)}</div>
+          {readings.length ? <div className="card rows overflow-hidden">{readings.map((r) => <LiteratureRow key={r.id} title={r.title} authors={r.authors} year={r.year} doi={r.doi} status={r.verification_status} href={`/catat/literatur/${r.id}${K}`} readHref={`/bahasa/baca?bacaan=${r.id}`} />)}</div>
             : <div className="card"><EmptyState>Belum ada literatur. Tekan + untuk menambah.</EmptyState></div>}
         </Section>
         <Section title="Ide lanjutan" add={{ href: `/catat/ide${K}${pid}`, label: 'Tambah ide riset' }}>
