@@ -54,7 +54,7 @@ export async function handleMessage(ctx: ToolCtx, model: AgentModel | null, text
       return { conversation_id: r.conversation_id, reply: r.reply, proposed_actions: await loadCards(ctx.db, r.action_ids, lookups, ctx.today), lookups, offline: null, english_feedback: null };
     } catch (e) {
       if (!(e instanceof ModelError)) throw e;
-      console.error('[agent] Gemini gagal, pakai pengurai lokal:', e.reason, e.message);
+      console.error('[agent] Gemini gagal, pakai pengurai lokal:', e.reason, '|', e.message, '|', e.detail);
       offline = OFFLINE_REASON[e.reason];
       // usulan yang sempat dibuat sebelum model gagal tidak ditampilkan, jadi ditolak supaya tidak menggantung
       await ctx.db.from('agent_actions').update({ status: 'rejected' }).eq('status', 'proposed').gte('created_at', ctx.now.toISOString());
