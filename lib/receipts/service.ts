@@ -1,7 +1,7 @@
 // Alur unggah struk (SPEC 7.2): tolak duplikat → simpan ke bucket privat → Gemini membaca → usulan aksi.
 // Data baru berubah setelah pengguna menyetujui kartu, sama seperti input teks (SPEC 6.3).
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ensureConversation } from '@/lib/agent/core';
+import { ensureConversation, insertMessages } from '@/lib/agent/core';
 import { ModelError, type AgentModel } from '@/lib/agent/model';
 import { loadCards, loadLookups } from '@/lib/agent/service';
 import type { CardView, Lookups } from '@/lib/agent/cards';
@@ -96,7 +96,7 @@ export async function handleReceiptUpload(ctx: ToolCtx, model: AgentModel | null
   const convId = await ensureConversation(db, input.conversationId, 'receipt', `Struk ${extraction.merchant ?? input.fileName ?? ''}`.trim());
   const proposal = await proposeFromReceipt(ctx, row.id, extraction, convId);
   const reply = proposal.kind === 'proposed' ? `Struk terbaca: ${proposal.summary}` : proposal.message;
-  await db.from('agent_messages').insert([
+  await insertMessages(db, [
     { conversation_id: convId, role: 'user', content: { role: 'user', parts: [{ text: `[struk${input.fileName ? `: ${input.fileName}` : ''}]` }] } },
     { conversation_id: convId, role: 'model', content: { role: 'model', parts: [{ text: reply }] } },
   ]);

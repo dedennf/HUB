@@ -3,6 +3,15 @@
 // audio tetap dikirim utuh ke Gemini (D-47).
 
 export const MAX_SECONDS = 60;
+/** Puncak RMS di bawah ini dianggap sunyi: rekaman tidak dikirim, supaya Gemini tidak mengarang isi (D-49). */
+export const SILENCE_RMS = 0.02;
+
+/** RMS sampel PCM 8-bit tak bertanda (getByteTimeDomainData, diam = 128). */
+export function rmsOfBytes(data: Uint8Array): number {
+  let sum = 0;
+  for (let i = 0; i < data.length; i++) { const x = (data[i] - 128) / 128; sum += x * x; }
+  return data.length ? Math.sqrt(sum / data.length) : 0;
+}
 const RATE = 16_000;
 const CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/aac'];
 
@@ -59,7 +68,9 @@ export class VoiceRecorder {
   private raf = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
   private started = 0;
-  private done: ((r: { blob: Blob; seconds: number } | null) => void) | null = null;
+  private done: ((r: { blob: Blob; seconds: number; peak: number } | null) => void) | null = null;
+  /** Puncak keras suara selama merekam (RMS 0..1). -1 bila Web Audio tidak tersedia (tidak bisa menilai). */
+  private peak = -1;
   private cancelled = false;
 
   constructor(private onUpdate: (u: RecorderUpdate) => void, private onLimit: () => void) {}
@@ -74,7 +85,7 @@ export class VoiceRecorder {
       const seconds = Math.round((Date.now() - this.started) / 1000);
       const blob = new Blob(this.chunks, { type: this.rec?.mimeType || mime || 'audio/webm' });
       this.cleanup();
-      this.done?.(this.cancelled ? null : { blob, seconds });
+      this.done?.(this.cancelled ? null : { blob, seconds, peak: this.peak });
     };
     this.started = Date.now();
     this.rec.start(250);
@@ -93,7 +104,11 @@ export class VoiceRecorder {
       an.fftSize = 64;
       this.audioCtx.createMediaStreamSource(this.stream!).connect(an);
       const data = new Uint8Array(an.frequencyBinCount);
+      const wave = new Uint8Array(an.fftSize);
+      this.peak = 0;
       const tick = () => {
+        an.getByteTimeDomainData(wave);
+        this.peak = Math.max(this.peak, rmsOfBytes(wave));
         an.getByteFrequencyData(data);
         const levels = Array.from({ length: 16 }, (_, i) => (data[i + 1] ?? 0) / 255);
         this.onUpdate({ seconds: Math.floor((Date.now() - this.started) / 1000), levels });
@@ -105,7 +120,7 @@ export class VoiceRecorder {
     }
   }
 
-  stop(): Promise<{ blob: Blob; seconds: number } | null> {
+  stop(): Promise<{ blob: Blob; seconds: number; peak: number } | null> {
     return new Promise((resolve) => {
       if (!this.rec || this.rec.state === 'inactive') { resolve(null); return; }
       this.done = resolve;

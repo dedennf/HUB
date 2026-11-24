@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encodeWav, pickMime } from './recorder';
+import { encodeWav, pickMime, rmsOfBytes } from './recorder';
 
 describe('pickMime', () => {
   it('webm/opus di Chrome, mp4 di Safari, kosong bila tidak ada', () => {
@@ -22,5 +22,12 @@ describe('encodeWav', () => {
     expect(v.getUint16(34, true)).toBe(16);
     expect(v.getUint32(40, true)).toBe(8);
     expect([v.getInt16(46, true), v.getInt16(48, true)]).toEqual([32767, -32768]);
+  });
+});
+
+describe('rmsOfBytes', () => {
+  it('diam (128) = 0, ayunan penuh mendekati 1', () => {
+    expect(rmsOfBytes(new Uint8Array(64).fill(128))).toBe(0);
+    expect(rmsOfBytes(Uint8Array.from({ length: 64 }, (_, i) => (i % 2 ? 0 : 255)))).toBeGreaterThan(0.95);
   });
 });
