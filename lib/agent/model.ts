@@ -1,5 +1,5 @@
 // Antarmuka model untuk loop agen. Implementasi nyata memakai Gemini (@google/genai), uji memakai model tiruan.
-import { ApiError, GoogleGenAI, type Content, type FunctionDeclaration } from '@google/genai';
+import { ApiError, GoogleGenAI, ThinkingLevel as GenaiThinkingLevel, type Content, type FunctionDeclaration } from '@google/genai';
 
 export type { Content };
 export type FunctionCallOut = { id?: string; name: string; args: Record<string, unknown> };
@@ -19,32 +19,60 @@ export class ModelError extends Error {
   }
 }
 
-export function geminiConfig(): { apiKey: string; model: string; baseUrl?: string } | null {
+export type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high' | 'off';
+export type GeminiConfig = { apiKey: string; model: string; baseUrl?: string; thinkingLevel?: ThinkingLevel };
+
+/** Tingkat berpikir bawaan "low": Ra butuh jawaban cepat untuk perintah pendek (D-43). */
+export function readThinkingLevel(raw: string | undefined): ThinkingLevel {
+  const v = raw?.trim().toLowerCase();
+  return v === 'minimal' || v === 'low' || v === 'medium' || v === 'high' || v === 'off' ? v : 'low';
+}
+
+export function geminiConfig(): GeminiConfig | null {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   const model = process.env.GEMINI_MODEL?.trim();
   if (!apiKey || !model) return null;
   // GEMINI_BASE_URL hanya untuk uji lokal dengan server tiruan. Jangan diisi di production.
-  return { apiKey, model, baseUrl: process.env.GEMINI_BASE_URL?.trim() || undefined };
+  return { apiKey, model, baseUrl: process.env.GEMINI_BASE_URL?.trim() || undefined, thinkingLevel: readThinkingLevel(process.env.GEMINI_THINKING_LEVEL) };
 }
+
+/** Model yang menolak thinkingLevel (mis. generasi lama). Diingat selama proses server hidup. */
+const noThinkingLevel = new Set<string>();
 
 export class GeminiModel implements AgentModel {
   private ai: GoogleGenAI;
   readonly name: string;
 
-  constructor(cfg: { apiKey: string; model: string; baseUrl?: string }) {
-    this.ai = new GoogleGenAI({ apiKey: cfg.apiKey, httpOptions: { timeout: 20_000, ...(cfg.baseUrl ? { baseUrl: cfg.baseUrl } : {}) } });
+  private thinkingLevel: ThinkingLevel;
+
+  constructor(cfg: GeminiConfig) {
+    // timeout juga dikirim ke Google sebagai X-Server-Timeout: lewat dari ini Google membalas 504 DEADLINE_EXCEEDED
+    this.ai = new GoogleGenAI({ apiKey: cfg.apiKey, httpOptions: { timeout: 25_000, ...(cfg.baseUrl ? { baseUrl: cfg.baseUrl } : {}) } });
     this.name = cfg.model;
+    this.thinkingLevel = cfg.thinkingLevel ?? 'low';
   }
 
   async generate(req: ModelRequest): Promise<ModelTurn> {
     try {
       return await this.once(req);
     } catch (e) {
-      // 5xx dari Gemini (mis. model sedang penuh) biasanya sementara: coba sekali lagi
-      if (!(e instanceof ModelError) || e.reason !== 'unavailable' || !/^\S+ 5\d\d /.test(e.detail) || req.signal?.aborted) throw e;
-      await new Promise((r) => setTimeout(r, 800));
-      return this.once(req);
+      if (!(e instanceof ModelError) || req.signal?.aborted) throw e;
+      // model tidak mengenal thinkingLevel: ingat, lalu kirim ulang tanpa pengaturan itu
+      if (e.reason === 'rejected' && this.usesThinkingLevel() && /^\S+ 400 /.test(e.detail) && /thinking/i.test(e.detail)) {
+        noThinkingLevel.add(this.name);
+        return this.once(req);
+      }
+      // 500/502/503 biasanya sementara: coba sekali lagi. 504 berarti batas waktu habis, mengulang hanya membuang waktu.
+      if (e.reason === 'unavailable' && /^\S+ 50[023] /.test(e.detail)) {
+        await new Promise((r) => setTimeout(r, 800));
+        return this.once(req);
+      }
+      throw e;
     }
+  }
+
+  private usesThinkingLevel(): boolean {
+    return this.thinkingLevel !== 'off' && !noThinkingLevel.has(this.name);
   }
 
   private async once(req: ModelRequest): Promise<ModelTurn> {
@@ -58,6 +86,7 @@ export class GeminiModel implements AgentModel {
           temperature: 0.2,
           abortSignal: req.signal,
           automaticFunctionCalling: { disable: true },
+          ...(this.usesThinkingLevel() ? { thinkingConfig: { thinkingLevel: this.thinkingLevel.toUpperCase() as GenaiThinkingLevel } } : {}),
         },
       });
       // Konten model dikembalikan utuh (termasuk thoughtSignature) agar riwayat sah untuk giliran berikutnya.
@@ -74,6 +103,7 @@ export class GeminiModel implements AgentModel {
       const status = e instanceof ApiError || err.name === 'ApiError' ? err.status : undefined;
       if (status === 429) throw new ModelError('quota', 'Kuota Gemini sedang habis.', detail);
       if (status === 400 || status === 403 || status === 404) throw new ModelError('rejected', `Gemini menolak permintaan (${status}). Periksa GEMINI_API_KEY dan GEMINI_MODEL.`, detail);
+      if (status === 504) throw new ModelError('timeout', 'Gemini tidak menjawab tepat waktu.', detail);
       if (status) throw new ModelError('unavailable', `Gemini bermasalah (${status}).`, detail);
       if (err.name === 'AbortError' || /timeout|timed out/i.test(err.message ?? '')) throw new ModelError('timeout', 'Gemini tidak menjawab tepat waktu.', detail);
       throw new ModelError('unavailable', 'Tidak bisa terhubung ke Gemini.', detail);

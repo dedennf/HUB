@@ -28,6 +28,7 @@ Salin `.env.example` ke `.env.local` untuk lokal, dan isi yang sama di Vercel (S
 | `APP_TIMEZONE` | `Asia/Jakarta` |
 | `GEMINI_API_KEY` | kunci API dari Google AI Studio, untuk Ra (Fase 3) |
 | `GEMINI_MODEL` | nama model Gemini yang dipakai Ra, misalnya model Flash terbaru yang tersedia di akunmu |
+| `GEMINI_THINKING_LEVEL` | opsional: `minimal`, `low` (bawaan), `medium`, `high`, atau `off`. Makin rendah makin cepat |
 
 Tanpa dua variabel Gemini, Ra tetap jalan memakai pengurai lokal dan menampilkan banner "Gemini belum diatur".
 

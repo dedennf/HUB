@@ -404,3 +404,13 @@ Batas laju 30 pesan per menit dihitung dari `agent_messages` peran `user`. `agen
 - Loop Gemini punya batas waktu total 40 detik (`AGENT_BUDGET_MS`), dan tiap panggilan Gemini 20 detik. Setelah itu pengurai lokal mengambil alih, jauh sebelum fungsi Vercel dipotong di 60 detik (yang sebelumnya muncul sebagai "tidak tersambung ke server").
 - Galat di luar model saat loop agen (database, tool, data tak terduga) dicatat lengkap di log `[agent] loop agen galat` lalu tetap dilayani pengurai lokal dengan banner "galat di server Ra".
 - Pesan galat di chat kini menyebut penyebabnya (status HTTP, waktu habis, sesi login habis, atau tidak ada internet) alih-alih satu kalimat umum.
+
+## D-43 · Tingkat berpikir Gemini dan batas waktu per panggilan
+**Status: Diputuskan**
+
+Di production Gemini membalas `504 DEADLINE_EXCEEDED`. SDK mengirim `httpOptions.timeout` ke Google sebagai `X-Server-Timeout`, jadi satu panggilan berpikir lebih dari 20 detik dihentikan Google sendiri. Penyebabnya mode berpikir bawaan model Gemini 3 untuk konteks berisi 38 deklarasi tool.
+
+- `thinkingConfig.thinkingLevel` dikirim dengan bawaan `low`. Bisa diatur lewat `GEMINI_THINKING_LEVEL` (`minimal`, `low`, `medium`, `high`, atau `off` untuk tidak mengirimnya).
+- Bila model menolak pengaturan ini (400 yang menyebut thinking), permintaan dikirim ulang tanpa pengaturan itu dan model tersebut diingat selama proses server hidup.
+- Batas per panggilan 25 detik, batas loop tetap 40 detik (D-42).
+- 504 dipetakan ke `timeout` dan tidak dicoba ulang. Hanya 500, 502, dan 503 yang dicoba ulang sekali.
