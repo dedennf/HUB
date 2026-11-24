@@ -52,7 +52,7 @@ export default async function BerandaPage() {
     ...bills.map((b) => {
       const d = diffDays(b.next_due_date!, today);
       const when = d < 0 ? `lewat ${-d} hari` : d === 0 ? 'jatuh tempo hari ini' : `jatuh tempo ${d} hari lagi`;
-      return { key: b.id, color: 'bill' as const, text: `${b.name} ${formatRpShort(b.amount)} ${when}`, action: { label: 'Bayar', href: '/keuangan?tab=rencana' } };
+      return { key: b.id, color: 'bill' as const, text: `${b.name} ${formatRpShort(b.amount)} ${when}`, action: { label: 'Bayar', href: `/keuangan/tagihan/${b.id}/bayar` } };
     }),
     ...(dueVocab > 0 ? [{ key: 'vocab', color: 'study' as const, text: `${dueVocab} kosakata siap diulang`, action: { label: 'Ulang', href: '/bahasa' } }] : []),
   ];

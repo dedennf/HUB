@@ -22,10 +22,10 @@ export default function KomponenPage() {
         <div className="flex flex-col gap-3">
           <ChatBubble from="user" voiceSeconds={7}>contoh: tadi beli bensin 30rb pakai gopay, terus tugas laporan dikumpul jumat jam 12 malem</ChatBubble>
           <ChatBubble from="ra">Oke, ada 2 hal. Cek dulu sebelum disimpan.</ChatBubble>
-          <ActionCard icon={TrendingDown} tone="expense" kindLabel="Pengeluaran" value="Rp30.000" chips={[{ label: 'Transportasi' }, { label: 'GoPay' }, { label: 'Hari ini' }]} />
+          <ActionCard icon={TrendingDown} tone="expense" kindLabel="Pengeluaran" value="Rp30.000" chips={[{ label: 'Transportasi' }, { label: 'GoPay' }, { label: 'Hari ini' }]} editable />
           <ActionCard icon={CalendarCheck} tone="task" kindLabel="Tugas baru" value="Laporan contoh"
             chips={[{ label: 'Mata kuliah contoh' }, { label: 'Jum 27 Nov · 23.59', doubtful: true, onEditLabel: 'tenggat' }]}
-            note={'"Jam 12 malem" dibaca 23.59. Ketuk untuk ubah.'} />
+            note={'"Jam 12 malem" dibaca 23.59. Ketuk untuk ubah.'} editable />
           <ActionBar count={2} />
         </div>
       </Section>

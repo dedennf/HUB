@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Chip, type ChipTone } from './Chip';
 
 const STATUS: Record<string, { label: string; tone: ChipTone }> = {
@@ -8,11 +9,11 @@ const STATUS: Record<string, { label: string; tone: ChipTone }> = {
 };
 
 /** Judul, penulis · tahun, chip status verifikasi. */
-export function LiteratureRow({ title, authors, year, doi, status }: { title: string; authors: string | null; year: number | null; doi: string | null; status: string }) {
+export function LiteratureRow({ title, authors, year, doi, status, href }: { title: string; authors: string | null; year: number | null; doi: string | null; status: string; href?: string }) {
   const s = STATUS[status] ?? STATUS.unchecked;
   return (
     <div className="px-4 py-3">
-      <p className="text-[14px] font-semibold leading-snug">{title}</p>
+      {href ? <Link href={href} className="flex min-h-11 items-center text-[14px] font-semibold leading-snug hover:text-accent">{title}</Link> : <p className="text-[14px] font-semibold leading-snug">{title}</p>}
       <div className="mt-1 flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-[12px] text-muted">
           {[authors, year].filter(Boolean).join(' · ') || 'Penulis belum diisi'}

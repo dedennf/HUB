@@ -284,3 +284,43 @@ Token lain yang ditambahkan karena dibutuhkan komponen DESIGN 6 tetapi tidak ter
 - UndoToast sudah dipakai sungguhan: setelah mencatat transaksi manual, tombol Batalkan selama 10 detik menghapus transaksi itu (saldo ikut kembali lewat pemicu).
 - Flashcard dan StatTile ditunda ke fase Bahasa Inggris karena belum ada halaman yang memakainya.
 - Mencentang tugas di TaskRow langsung menyimpan status (aksi pengguna sendiri, bukan usulan Ra).
+
+---
+
+# Keputusan Fase 1c · Port fitur lama
+
+## D-31 · Formulir generik untuk semua modul
+**Status: Diputuskan**
+
+Satu daftar entitas (`lib/entities/registry.ts`) memuat field, skema Zod, dan pemetaan baris untuk 19 jenis data: tugas, mata kuliah, jadwal, materi, semester, acara, libur, proyek riset, target, kebutuhan, ide, literatur, bimbingan, tagihan, utang/piutang, target tabungan, biaya sejati, investasi, dan kategori. Halaman `/catat/[jenis]` (tambah) dan `/catat/[jenis]/[id]` (ubah dan hapus) serta satu server action melayani semuanya. Query string mengisi nilai awal (mis. `/catat/jadwal?course_id=…`), dan `?kembali=` menentukan tujuan setelah simpan.
+
+Aturan khusus:
+- Semester aktif hanya satu: menandai satu semester aktif otomatis menonaktifkan yang lain.
+- Menyimpan target riset memperbarui `last_touched_at`.
+- Rencana kerja tugas disimpan sebagai satu `task_work_slots` (bukan usulan agen), durasi bawaan 2 jam.
+- Kategori bawaan tidak bisa dihapus, hanya disembunyikan.
+
+Aksi khusus di luar formulir generik:
+- **Bayar tagihan** mencatat pengeluaran lalu memajukan jatuh tempo (bulanan +1 bulan, tahunan +1 tahun, sekali bayar = nonaktif).
+- **Cicilan utang atau piutang** menambah `paid_amount`, dan bila akun dipilih ikut mencatat transaksi.
+- **Cocokkan saldo** mencatat selisih sebagai transaksi penyesuaian di kategori Lainnya.
+
+## D-32 · Ra memakai pengurai lokal sebelum Gemini
+**Status: Diputuskan**
+
+Pengurai lokal app lama di-port ke `lib/parse/` (fungsi murni, tanggal selalu dihitung dari tanggal WIB yang dikirim server). Input Ra di panel laptop dan sheet HP aktif. Perintah yang dikenali: transaksi (keluar, masuk, transfer, tarik atau setor tunai, biaya admin), tugas (dengan mata kuliah, tenggat, rencana kerja), acara (jam, tempat, berulang, beberapa hari), ide, kebutuhan riset, serta pertanyaan saldo, pengeluaran atau pemasukan per periode dan kategori, tugas, dan tagihan. Beberapa perintah sekaligus bisa dipisah koma, "terus", atau "lalu".
+
+Sesuai SPEC 6.3, hasilnya selalu berupa kartu usulan. Tidak ada data yang berubah sampai pengguna menekan Setujui. Setelah disimpan, toast Batalkan 10 detik menghapus semua yang baru dibuat. Usulan belum dicatat di `agent_actions` dan chip belum bisa diubah langsung, karena itu bagian Fase 3 (agen Gemini). Selama fitur suara belum ada, tombol bulat accent di bar input menjadi tombol kirim.
+
+Keempat kalimat uji SPEC Fase 3 sudah lolos di unit test pengurai. Perintah app lama yang belum di-port ke pengurai (mengubah akun, mata kuliah, jadwal, anggaran, utang, tagihan, investasi lewat kalimat) tersedia lewat formulir dan akan ditangani Ra Gemini.
+
+## D-33 · Kalender bulan dan minggu, ekspor cadangan
+**Status: Diputuskan**
+
+- Kalender punya tiga tampilan lewat `?tampilan=`: Agenda (bawaan), Minggu, dan Bulan. Tampilan bulan memakai kisi Senin sampai Minggu dengan titik warna per jenis item, dan daftar item hari terpilih di bawahnya.
+- Ekspor: `/api/ekspor/json` (seluruh tabel data, tanpa `user_id`, format `{ app: 'kompas', version: 1 }`) dan `/api/ekspor/csv` (transaksi, waktu WIB, UTF-8 dengan BOM agar terbaca Excel). Keduanya hanya untuk pemilik. Impor dari format Kompas sendiri belum dibuat, karena data sudah tersimpan di database dan tersinkron.
+
+## D-34 · Fitur lama yang belum kembali setelah Fase 1c
+**Status: Dicatat**
+
+Dari daftar AUDIT Bagian 7, yang belum ada: subtugas (kolom `parent_id` sudah ada, belum ada UI), tautan literatur ke target dan ide (kolom sudah ada), gabung kategori, statistik belajar (persen tepat waktu, streak), grafik cashflow 6 bulan, mode offline PWA (Fase 6), dan pemulihan dari cadangan JSON Kompas. Semuanya bisa dikerjakan bersama fase yang relevan.

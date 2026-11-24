@@ -3,8 +3,7 @@ import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useRa } from '@/components/providers/RaProvider';
 import { EnglishModeSwitch } from './EnglishModeSwitch';
-import { RaComingSoon } from './RaComingSoon';
-import { RaInputBar } from './RaInputBar';
+import { RaChat } from './RaChat';
 import { RaAvatar } from './RaMark';
 
 /** Bottom sheet Ra untuk HP (DESIGN 6, rujukan Agen.dc.html). */
@@ -41,9 +40,8 @@ export function RaSheet() {
             </button>
           </span>
         </header>
-        <div className="flex-1 overflow-y-auto px-5"><RaComingSoon /></div>
-        <div className="border-t border-line bg-bg px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
-          <RaInputBar />
+        <div className="flex min-h-0 flex-1 flex-col px-4 pb-[max(12px,env(safe-area-inset-bottom))]">
+          {sheetOpen && <RaChat />}
         </div>
       </div>
     </dialog>

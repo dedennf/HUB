@@ -1,12 +1,13 @@
 'use client';
 import { Check } from 'lucide-react';
+import Link from 'next/link';
 import { useOptimistic, useTransition } from 'react';
 import { setTaskDone } from '@/app/(dashboard)/kuliah/actions';
 import { Chip, type ChipTone } from './Chip';
 
 /** Lingkaran centang 28 px (tombol), judul, keterangan, chip tenggat. Centang benar-benar menyimpan status. */
-export function TaskRow({ id, title, detail, dueLabel, dueTone = 'neutral', done }: {
-  id: string; title: string; detail?: string; dueLabel?: string; dueTone?: ChipTone; done: boolean;
+export function TaskRow({ id, title, detail, dueLabel, dueTone = 'neutral', done, href }: {
+  id: string; title: string; detail?: string; dueLabel?: string; dueTone?: ChipTone; done: boolean; href?: string;
 }) {
   const [optimisticDone, setOptimistic] = useOptimistic(done);
   const [pending, start] = useTransition();
@@ -23,10 +24,10 @@ export function TaskRow({ id, title, detail, dueLabel, dueTone = 'neutral', done
           {optimisticDone && <Check size={16} strokeWidth={2.5} aria-hidden="true" />}
         </span>
       </button>
-      <span className="min-w-0 flex-1">
+      <Link href={href ?? `/catat/tugas/${id}`} className="min-w-0 flex-1 py-1 hover:text-accent">
         <span className={`block text-[14px] font-semibold ${optimisticDone ? 'text-muted line-through' : ''}`}>{title}</span>
         {detail && <span className="block text-[12px] text-muted">{detail}</span>}
-      </span>
+      </Link>
       {dueLabel && !optimisticDone && <Chip tone={dueTone}>{dueLabel}</Chip>}
     </div>
   );
