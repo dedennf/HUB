@@ -203,7 +203,8 @@
   .label { @apply mb-1.5 block text-[12px] font-semibold text-muted; }
   .input { @apply min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-[15px] text-fg outline-none placeholder:text-muted focus:border-accent; }
   .btn { @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-4 text-[14px] font-semibold text-fg transition-colors hover:border-accent disabled:cursor-not-allowed disabled:opacity-50; }
-  .btn-primary { @apply border-accent-fill bg-accent-fill text-on-accent hover:opacity-90; }
+  /* hover menggelap, bukan memudar: opacity 90% menurunkan kontras teks putih ke 4,2:1 */
+  .btn-primary { @apply border-accent-fill bg-accent-fill text-on-accent hover:brightness-90; }
   .btn-danger { @apply border-danger-bg bg-danger-bg text-danger-fg; }
   .h-page { @apply font-display text-[22px] font-extrabold leading-tight lg:text-[26px]; }
   .h-section { @apply font-display text-[15px] font-bold lg:text-[16px]; }

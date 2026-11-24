@@ -5,12 +5,14 @@ import { Chip } from '@/components/ui/Chip';
 import { MoneyChart } from '@/components/ui/MoneyChart';
 import { MoneyHero } from '@/components/ui/MoneyHero';
 import { ProgressCard } from '@/components/ui/ProgressCard';
-import { ProposalBanner } from '@/components/ui/ProposalBanner';
+import { PendingActions } from '@/components/ra/PendingActions';
+import { cardFor, type ActionRow } from '@/lib/agent/cards';
+import { loadLookups } from '@/lib/agent/service';
 import { QuickActions } from '@/components/ui/QuickActions';
 import { EmptyState } from '@/components/ui/Section';
 import { buildCalendarItems } from '@/lib/calendar';
 import {
-  countDueVocab, countProposedActions, countUnreadNotifications, db, getAccounts, getCalendarSources, getCourses, getDebts,
+  countDueVocab, countUnreadNotifications, db, getAccounts, getCalendarSources, getCourses, getDebts,
   getInvestments, getResearchProjects, getSettings, getTransactionsSince,
 } from '@/lib/data';
 import { netWorth, netWorthChangeThisMonth, RANGES, readyMoney, readyMoneySeries, type RangeKey } from '@/lib/finance';
@@ -20,13 +22,22 @@ import { readText } from '@/lib/settings';
 import { dueChip, dueText } from '@/lib/tasks';
 import { addDays, diffDays, todayIso, zonedParts } from '@/lib/time';
 
+/** Usulan yang masih menunggu, 7 hari terakhir (SPEC 8.1: usulan otomasi dikonfirmasi di Beranda). */
+async function loadPending(s: Awaited<ReturnType<typeof db>>, today: string) {
+  const { data } = await s.from('agent_actions').select('id,tool_name,summary,permission,status,args,result')
+    .eq('status', 'proposed').gte('created_at', new Date(Date.now() - 7 * 86400_000).toISOString()).order('created_at', { ascending: false }).limit(10);
+  if (!data?.length) return { cards: [], lookups: { accounts: [], categories: [], courses: [] } };
+  const lookups = await loadLookups(s);
+  return { cards: (data as ActionRow[]).map((r) => cardFor(r, lookups, today)), lookups };
+}
+
 export default async function BerandaPage() {
   const now = new Date();
   const today = todayIso(now);
   const s = await db();
-  const [accounts, investments, debts, sources, courses, txs, projects, proposals, unread, dueVocab, settings] = await Promise.all([
+  const [accounts, investments, debts, sources, courses, txs, projects, pending, unread, dueVocab, settings] = await Promise.all([
     getAccounts(s), getInvestments(s), getDebts(s), getCalendarSources(s), getCourses(s), getTransactionsSince(s, addDays(today, -365)),
-    getResearchProjects(s), countProposedActions(s), countUnreadNotifications(s), countDueVocab(s), getSettings(s, ['profile_name']),
+    getResearchProjects(s), loadPending(s, today), countUnreadNotifications(s), countDueVocab(s), getSettings(s, ['profile_name']),
   ]);
 
   const ready = readyMoney(accounts);
@@ -106,7 +117,7 @@ export default async function BerandaPage() {
         </section>
       </div>
 
-      <ProposalBanner count={proposals} href="/pengaturan/memori" />
+      {pending.cards.length > 0 && <PendingActions cards={pending.cards} lookups={pending.lookups} />}
 
       {research && (
         <div className="hidden lg:block">

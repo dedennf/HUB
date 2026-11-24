@@ -5,6 +5,10 @@ export const SETTING_SCHEMAS = {
   theme: z.enum(['auto', 'light', 'dark']),
   profile_name: z.string().trim().max(40),
   profile_program: z.string().trim().max(60),
+  briefing_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  recap_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  vocab_review_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  quiet_hours: z.tuple([z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)]),
 } as const;
 export type SettingKey = keyof typeof SETTING_SCHEMAS;
 
