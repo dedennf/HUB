@@ -40,6 +40,25 @@ export async function diagnoseLive(apiKey: string, model: string, config: LiveCo
     return { model, test, ok: true, ms: Date.now() - t0, reply: reply.slice(0, 120) };
   } catch (e) {
     const err = e as Error & { status?: number };
-    return { model, test, ok: false, ms: Date.now() - t0, reason: err.status === 429 ? 'quota' : 'galat', detail: `${err.status ?? ''} ${err.message}`.trim().slice(0, 400) };
+    const msg = `${err.status ?? ''} ${err.message}`.trim();
+    const unsupported = /not found|not supported for bidiGenerateContent/i.test(msg);
+    let hint = '';
+    if (unsupported) {
+      // sebutkan model yang benar-benar mendukung Live untuk API key ini, supaya GEMINI_LIVE_MODEL bisa langsung diganti
+      const names = await liveCapableModels(apiKey, opts.baseUrl).catch(() => null);
+      hint = names === null ? ' · daftar model Live gagal diambil' : names.length ? ` · model Live yang tersedia: ${names.join(', ')}` : ' · API key ini tidak punya model Live';
+    }
+    return { model, test, ok: false, ms: Date.now() - t0, reason: err.status === 429 ? 'quota' : unsupported ? 'model_tidak_mendukung_live' : 'galat', detail: `${msg.slice(0, 300)}${hint}`.slice(0, 700) };
   }
+}
+
+/** Nama model (tanpa awalan models/) yang mendukung bidiGenerateContent, yaitu Live API. */
+export async function liveCapableModels(apiKey: string, baseUrl?: string): Promise<string[]> {
+  const ai = new GoogleGenAI({ apiKey, httpOptions: baseUrl ? { baseUrl } : undefined });
+  const out: string[] = [];
+  const pager = await ai.models.list({ config: { pageSize: 100 } });
+  for await (const m of pager) {
+    if (m.name && m.supportedActions?.includes('bidiGenerateContent')) out.push(m.name.replace(/^models\//, ''));
+  }
+  return out.sort();
 }

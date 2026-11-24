@@ -564,3 +564,9 @@ Sesi latihan dicatat ke `practice_sessions` (review saat dek selesai, baca saat 
 - **Riwayat**: transkrip dua arah disimpan ke `agent_messages` saat percakapan diakhiri (`/api/live/end`, kanal `voice`, judul "Percakapan langsung"). Audio tidak disimpan.
 - **Mode bahasa Inggris**: di `/bahasa/bicara`, instruksi sistem berupa partner percakapan sesuai level, tujuan, tingkat koreksi, dan pola kesalahan teratas. Koreksi disampaikan dengan mengulang bentuk yang benar secara natural, tanpa ceramah. Mode ini tanpa tools. Durasi tercatat sebagai `practice_sessions` kind `speaking`.
 - **Verifikasi production**: `/api/agent/diagnose` membuat token dengan konfigurasi asisten yang sama persis (termasuk 38 tool), tersambung, dan menunggu jawaban pertama. Dengan begitu nama model Live dan penerimaan deklarasi tool bisa dipastikan di server asli. Uji lokal memakai server Live tiruan (WebSocket) dengan protokol yang sama.
+
+## D-57 · Diagnosa Live menyebut model yang mendukung Live
+**Status: Diputuskan**
+
+- Bila uji percakapan langsung gagal karena model tidak ditemukan atau tidak mendukung `bidiGenerateContent`, `/api/agent/diagnose` memanggil `models.list` dengan API key server dan menuliskan model yang `supportedActions`-nya memuat `bidiGenerateContent`. Alasan galatnya `model_tidak_mendukung_live`. Tujuannya agar `GEMINI_LIVE_MODEL` bisa diganti dengan nama yang pasti tersedia untuk API key itu, tanpa menebak.
+- Pemicunya: production memakai `gemini-3.5-flash-lite` sebagai model Live, sedangkan model itu hanya untuk `generateContent`. Galatnya ditutup 1008.
