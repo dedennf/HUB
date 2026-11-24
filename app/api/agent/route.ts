@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     const res = await handleMessage(ctx, defaultModel(), parsed.data.text, parsed.data.conversation_id ?? null, { maxSteps, signal: req.signal });
     return NextResponse.json(res);
   } catch (e) {
-    console.error('[agent] gagal memproses pesan:', (e as Error).message);
-    return NextResponse.json({ error: 'Ra gagal memproses pesan. Coba lagi.' }, { status: 500 });
+    console.error('[agent] gagal memproses pesan:', e);
+    return NextResponse.json({ error: `Ra gagal memproses pesan (${(e as Error).message?.slice(0, 120) || 'galat server'}). Coba lagi.` }, { status: 500 });
   }
 }

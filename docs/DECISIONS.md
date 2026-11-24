@@ -397,3 +397,10 @@ Tebakan kategori dari kata lepas di catatan dipersempit: hanya kata minimal 4 hu
 Bila Gemini belum diatur atau gagal (kuota, timeout, ditolak, jaringan), `/api/agent` memakai pengurai lokal (D-32). Hasil pengurai diubah menjadi panggilan tool lalu disimpan sebagai `agent_actions` biasa, jadi kartu, konfirmasi, undo, dan Log Agen identik dengan jalur Gemini. Klien menampilkan `OfflineBanner` dengan alasannya. Slot "kerjakan" dari pengurai disimpan sebagai `followups` dan dijalankan setelah tugasnya tersimpan.
 
 Batas laju 30 pesan per menit dihitung dari `agent_messages` peran `user`. `agent_max_steps` dibaca dari tabel settings (bawaan 6, maksimal 12).
+
+## D-42 · Ra tidak boleh diam saat server bermasalah
+**Status: Diputuskan**
+
+- Loop Gemini punya batas waktu total 40 detik (`AGENT_BUDGET_MS`), dan tiap panggilan Gemini 20 detik. Setelah itu pengurai lokal mengambil alih, jauh sebelum fungsi Vercel dipotong di 60 detik (yang sebelumnya muncul sebagai "tidak tersambung ke server").
+- Galat di luar model saat loop agen (database, tool, data tak terduga) dicatat lengkap di log `[agent] loop agen galat` lalu tetap dilayani pengurai lokal dengan banner "galat di server Ra".
+- Pesan galat di chat kini menyebut penyebabnya (status HTTP, waktu habis, sesi login habis, atau tidak ada internet) alih-alih satu kalimat umum.

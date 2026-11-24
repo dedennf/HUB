@@ -41,21 +41,32 @@ export async function overRateLimit(ctx: ToolCtx): Promise<boolean> {
   return (count ?? 0) >= RATE_LIMIT_PER_MIN;
 }
 
+/** Batas waktu loop Gemini. Setelah ini pengurai lokal mengambil alih, jauh sebelum batas fungsi Vercel (60 detik). */
+export const AGENT_BUDGET_MS = 40_000;
+
 const OFFLINE_REASON: Record<ModelError['reason'], string> = {
   not_configured: 'Gemini belum diatur', quota: 'kuota habis', timeout: 'Gemini terlalu lama menjawab', rejected: 'permintaan ditolak Gemini', unavailable: 'Gemini tidak bisa dihubungi',
 };
 
-export async function handleMessage(ctx: ToolCtx, model: AgentModel | null, text: string, conversationId: string | null, opts: { maxSteps?: number; signal?: AbortSignal } = {}): Promise<AgentResponse> {
+export async function handleMessage(ctx: ToolCtx, model: AgentModel | null, text: string, conversationId: string | null, opts: { maxSteps?: number; signal?: AbortSignal; budgetMs?: number } = {}): Promise<AgentResponse> {
   const lookups = await loadLookups(ctx.db);
   let offline: string | null = model ? null : OFFLINE_REASON.not_configured;
   if (model) {
+    const budget = AbortSignal.timeout(opts.budgetMs ?? AGENT_BUDGET_MS);
+    const signal = opts.signal ? AbortSignal.any([opts.signal, budget]) : budget;
     try {
-      const r = await runAgent({ ctx, model, text, conversationId, maxSteps: opts.maxSteps, signal: opts.signal });
+      const r = await runAgent({ ctx, model, text, conversationId, maxSteps: opts.maxSteps, signal });
       return { conversation_id: r.conversation_id, reply: r.reply, proposed_actions: await loadCards(ctx.db, r.action_ids, lookups, ctx.today), lookups, offline: null, english_feedback: null };
     } catch (e) {
-      if (!(e instanceof ModelError)) throw e;
-      console.error('[agent] Gemini gagal, pakai pengurai lokal:', e.reason, '|', e.message, '|', e.detail);
-      offline = OFFLINE_REASON[e.reason];
+      if (opts.signal?.aborted) throw e;
+      if (e instanceof ModelError) {
+        console.error('[agent] Gemini gagal, pakai pengurai lokal:', e.reason, '|', e.message, '|', e.detail);
+        offline = budget.aborted ? OFFLINE_REASON.timeout : OFFLINE_REASON[e.reason];
+      } else {
+        // galat di luar model (database, tool, data tak terduga): catat lengkap, tetap layani lewat pengurai lokal
+        console.error('[agent] loop agen galat, pakai pengurai lokal:', e);
+        offline = 'galat di server Ra';
+      }
       // usulan yang sempat dibuat sebelum model gagal tidak ditampilkan, jadi ditolak supaya tidak menggantung
       await ctx.db.from('agent_actions').update({ status: 'rejected' }).eq('status', 'proposed').gte('created_at', ctx.now.toISOString());
     }
