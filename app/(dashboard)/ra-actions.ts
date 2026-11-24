@@ -4,6 +4,9 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth';
 import { formatDayShort, formatRp, formatTime } from '@/lib/format';
 import { parseCommand, type ParseContext, type Proposal, type Question } from '@/lib/parse/command';
+import { callTool, commitTool, mergeUndo, undo } from '@/lib/agent/executor';
+import { toolCtx } from '@/lib/agent/context';
+import type { UndoPayload } from '@/lib/agent/tools/types';
 import { createClient } from '@/lib/supabase/server';
 import { addDays, isHhmm, isIsoDate, todayIso, zonedParts, zonedToIso } from '@/lib/time';
 
@@ -23,7 +26,6 @@ export type ProposalView = {
   proposal: Proposal;
 };
 export type RaReply = { reply: string; lines?: string[]; proposals: ProposalView[] };
-export type Created = { table: string; id: string };
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -160,85 +162,70 @@ const proposalSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('need'), item: z.string().min(1).max(200), kind: z.string().max(30).nullable() }),
 ]);
 
-export type ApproveResult = { ok: boolean; message: string; created: Created[] };
+export type ApproveResult = { ok: boolean; message: string; undo: UndoPayload };
+
+/** Ubah usulan pengurai lokal menjadi panggilan tool registry (Fase 2). */
+function toToolCalls(p: z.infer<typeof proposalSchema>, today: string): { tool: string; args: Record<string, unknown> }[] {
+  switch (p.type) {
+    case 'transaction':
+      return p.kind === 'transfer'
+        ? [{ tool: 'add_transfer', args: { amount: p.amount, from_account: p.account_id, to_account: p.to_account_id, fee: p.fee || undefined, occurred_at: p.date === today ? undefined : p.date } }]
+        : [{ tool: 'add_transaction', args: { kind: p.kind, amount: p.amount, account: p.account_id, category: p.category_id ?? undefined, note: p.note || undefined, occurred_at: p.date === today ? undefined : p.date } }];
+    case 'task':
+      return [{ tool: 'add_task', args: { title: p.title, kind: p.kind, course: p.course_id ?? undefined, due_at: p.due_date ? `${p.due_date}T${p.due_time}` : undefined } }];
+    case 'event':
+      return [{ tool: 'add_event', args: {
+        title: p.title, start_at: p.start_time ? `${p.date}T${p.start_time}` : p.date,
+        end_at: p.end_date || p.end_time ? `${p.end_date ?? p.date}T${p.end_time ?? '23:59'}` : undefined,
+        location: p.location ?? undefined, recurrence: p.recurrence, recurrence_until: p.recurrence_until ?? undefined,
+      } }];
+    case 'idea':
+      return [{ tool: 'add_research_idea', args: { content: p.content } }];
+    case 'need':
+      return [{ tool: 'add_research_need', args: { item: p.item } }];
+  }
+}
 
 export async function approveRa(proposals: unknown[]): Promise<ApproveResult> {
   await requireUser();
   const parsed = z.array(proposalSchema).min(1).max(10).safeParse(proposals);
-  if (!parsed.success) return { ok: false, message: 'Ada usulan yang belum lengkap (mis. akun belum jelas). Batalkan lalu tulis ulang.', created: [] };
-  const db = await createClient();
-  const created: Created[] = [];
+  if (!parsed.success) return { ok: false, message: 'Ada usulan yang belum lengkap (mis. akun belum jelas). Batalkan lalu tulis ulang.', undo: { ops: [] } };
+  const ctx = await toolCtx();
+  const undos: UndoPayload[] = [];
   const done: string[] = [];
-  const fail = async (msg: string): Promise<ApproveResult> => { await undoCreated(db, created); return { ok: false, message: msg, created: [] }; };
-
+  const rollback = async (msg: string): Promise<ApproveResult> => {
+    await undo(ctx, mergeUndo(undos));
+    return { ok: false, message: msg, undo: { ops: [] } };
+  };
   for (const p of parsed.data) {
-    if (p.type === 'transaction') {
-      if (p.kind === 'transfer' && (!p.to_account_id || p.to_account_id === p.account_id)) return fail('Akun tujuan transfer belum jelas.');
-      const group = p.kind === 'transfer' && p.fee > 0 ? crypto.randomUUID() : null;
-      const occurred = p.date === todayIso() ? new Date().toISOString() : zonedToIso(p.date, '12:00');
-      const r = await db.from('transactions').insert({
-        kind: p.kind, amount: p.amount, account_id: p.account_id, to_account_id: p.kind === 'transfer' ? p.to_account_id : null,
-        category_id: p.kind === 'transfer' ? null : p.category_id, note: p.note || null, occurred_at: occurred, source: 'manual', group_id: group,
-      }).select('id').single();
-      if (r.error) return fail('Gagal menyimpan transaksi.');
-      created.push({ table: 'transactions', id: r.data.id });
-      if (group) {
-        const { data: admin } = await db.from('categories').select('id').eq('slug', 'o_admin').maybeSingle();
-        const f = await db.from('transactions').insert({
-          kind: 'expense', amount: p.fee, account_id: p.account_id, category_id: admin?.id ?? null, note: 'Biaya admin', occurred_at: occurred, source: 'manual', group_id: group,
-        }).select('id').single();
-        if (f.error) return fail('Gagal menyimpan biaya admin.');
-        created.push({ table: 'transactions', id: f.data.id });
+    for (const call of toToolCalls(p, ctx.today)) {
+      const prepared = await callTool(ctx, call.tool, call.args);
+      if (prepared.kind !== 'proposal') return rollback(prepared.kind === 'error' ? prepared.error : 'Usulan tidak valid.');
+      const res = await commitTool(ctx, call.tool, prepared.resolved);
+      if (!res.ok) return rollback(res.error);
+      undos.push(res.undo);
+      if (p.type === 'task' && p.work_date) {
+        const start = `${p.work_date}T${p.work_start ?? '19:00'}`;
+        const endIso = new Date(new Date(zonedToIso(p.work_date, p.work_start ?? '19:00')).getTime() + 2 * 3600_000).toISOString();
+        const slot = await callTool(ctx, 'schedule_task_work', { task: String(res.data.id), start_at: start, end_at: endIso });
+        if (slot.kind === 'proposal') {
+          const c = await commitTool(ctx, 'schedule_task_work', { ...(slot.resolved as object), suggested_by_agent: false });
+          if (c.ok) undos.push(c.undo);
+        }
       }
-      done.push(`${{ expense: 'Pengeluaran', income: 'Pemasukan', transfer: 'Transfer' }[p.kind]} ${formatRp(p.amount)}`);
-    } else if (p.type === 'task') {
-      const r = await db.from('tasks').insert({
-        title: p.title, kind: p.kind, course_id: p.course_id, due_at: p.due_date ? zonedToIso(p.due_date, p.due_time) : null,
-      }).select('id').single();
-      if (r.error) return fail('Gagal menyimpan tugas.');
-      created.push({ table: 'tasks', id: r.data.id });
-      if (p.work_date) {
-        const start = zonedToIso(p.work_date, p.work_start ?? '19:00');
-        await db.from('task_work_slots').insert({ task_id: r.data.id, start_at: start, end_at: new Date(new Date(start).getTime() + 2 * 3600_000).toISOString() });
-      }
-      done.push(p.title);
-    } else if (p.type === 'event') {
-      const r = await db.from('events').insert({
-        title: p.title, start_at: zonedToIso(p.date, p.start_time ?? '00:00'), is_all_day: !p.start_time,
-        end_at: p.end_date || p.end_time ? zonedToIso(p.end_date ?? p.date, p.end_time ?? '23:59') : null,
-        location: p.location, recurrence: p.recurrence, recurrence_until: p.recurrence_until,
-      }).select('id').single();
-      if (r.error) return fail('Gagal menyimpan acara.');
-      created.push({ table: 'events', id: r.data.id });
-      done.push(p.title);
-    } else {
-      const { data: project } = await db.from('research_projects').select('id').eq('status', 'active').order('created_at').limit(1).maybeSingle();
-      const r = p.type === 'idea'
-        ? await db.from('research_ideas').insert({ content: p.content, project_id: project?.id ?? null }).select('id').single()
-        : await db.from('research_needs').insert({ item: p.item, kind: p.kind, project_id: project?.id ?? null }).select('id').single();
-      if (r.error) return fail('Gagal menyimpan catatan riset.');
-      created.push({ table: p.type === 'idea' ? 'research_ideas' : 'research_needs', id: r.data.id });
-      done.push(p.type === 'idea' ? 'ide riset' : 'kebutuhan riset');
+      done.push(prepared.summary.split(' · ')[0]);
     }
   }
   revalidatePath('/', 'layout');
-  return { ok: true, message: `Tersimpan: ${done.join(', ')}`, created };
+  return { ok: true, message: `Tersimpan: ${done.join(', ')}`, undo: mergeUndo(undos) };
 }
 
-const UNDO_TABLES = new Set(['transactions', 'tasks', 'events', 'research_ideas', 'research_needs']);
-
-async function undoCreated(db: Db, created: Created[]) {
-  for (const c of [...created].reverse()) {
-    if (UNDO_TABLES.has(c.table) && /^[0-9a-f-]{36}$/i.test(c.id)) await db.from(c.table).delete().eq('id', c.id);
-  }
-}
-
-/** Tombol Batalkan di toast: menghapus semua yang baru dibuat dari satu persetujuan. */
-export async function undoRa(created: Created[]): Promise<{ ok: boolean }> {
+/** Tombol Batalkan di toast. Dari klien hanya operasi hapus baris yang baru dibuat yang diterima. */
+export async function undoRa(payload: UndoPayload): Promise<{ ok: boolean }> {
   await requireUser();
-  const list = z.array(z.object({ table: z.string(), id: z.uuid() })).max(20).safeParse(created);
-  if (!list.success) return { ok: false };
-  await undoCreated(await createClient(), list.data);
+  const ops = z.array(z.object({ op: z.literal('delete'), table: z.string(), id: z.uuid() })).max(30).safeParse(payload?.ops);
+  if (!ops.success) return { ok: false };
+  const r = await undo(await toolCtx(), { ops: ops.data });
   revalidatePath('/', 'layout');
-  return { ok: true };
+  return { ok: r.ok };
 }

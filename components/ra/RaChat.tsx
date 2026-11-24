@@ -1,7 +1,8 @@
 'use client';
 import { ArrowLeftRight, CalendarCheck, CalendarDays, ClipboardList, Lightbulb, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, useTransition, type RefObject } from 'react';
-import { approveRa, askRa, undoRa, type Created, type ProposalView } from '@/app/(dashboard)/ra-actions';
+import { approveRa, askRa, undoRa, type ProposalView } from '@/app/(dashboard)/ra-actions';
+import type { UndoPayload } from '@/lib/agent/tools/types';
 import { useRa, type RaMessage } from '@/components/providers/RaProvider';
 import { ActionBar } from './ActionBar';
 import { ActionCard } from './ActionCard';
@@ -24,7 +25,7 @@ const uid = () => Math.random().toString(36).slice(2);
 export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<HTMLInputElement | null>; showCamera?: boolean }) {
   const { messages, setMessages } = useRa();
   const [pending, start] = useTransition();
-  const [toast, setToast] = useState<{ text: string; created: Created[]; msgId: string } | null>(null);
+  const [toast, setToast] = useState<{ text: string; undo: UndoPayload; msgId: string } | null>(null);
   const [undoing, setUndoing] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -49,7 +50,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
     const r = await approveRa((msg.proposals ?? []).map((p) => p.proposal));
     if (!r.ok) { setMessages((m) => [...m, { id: uid(), from: 'ra', text: r.message }]); return; }
     update(msg.id, { status: 'approved' });
-    setToast({ text: r.message, created: r.created, msgId: msg.id });
+    setToast({ text: r.message, undo: r.undo, msgId: msg.id });
   });
 
   return (
@@ -99,7 +100,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
         <UndoToast key={toast.msgId} message={toast.text} undoing={undoing} onDone={() => setToast(null)}
           onUndo={async () => {
             setUndoing(true);
-            await undoRa(toast.created);
+            await undoRa(toast.undo);
             update(toast.msgId, { status: 'undone' });
             setUndoing(false);
             setToast(null);

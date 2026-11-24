@@ -324,3 +324,34 @@ Keempat kalimat uji SPEC Fase 3 sudah lolos di unit test pengurai. Perintah app 
 **Status: Dicatat**
 
 Dari daftar AUDIT Bagian 7, yang belum ada: subtugas (kolom `parent_id` sudah ada, belum ada UI), tautan literatur ke target dan ide (kolom sudah ada), gabung kategori, statistik belajar (persen tepat waktu, streak), grafik cashflow 6 bulan, mode offline PWA (Fase 6), dan pemulihan dari cadangan JSON Kompas. Semuanya bisa dikerjakan bersama fase yang relevan.
+
+---
+
+# Keputusan Fase 2 · Tools dan API
+
+## D-35 · Bentuk tool: baca langsung, tulis dua tahap
+**Status: Diputuskan**
+
+SPEC 6.8 meminta `execute()`, `summarize()`, dan `buildUndo()`. Di Kompas, tool tulis dipecah menjadi `prepare` dan `commit`:
+- `prepare` memvalidasi argumen (Zod), meresolusi nama ke id, dan menyusun ringkasan kartu. Tahap ini tidak pernah mengubah data, sehingga cocok dengan alur "usulan aksi" SPEC 6.2.
+- `commit` dijalankan setelah pengguna menyetujui dan mengembalikan `undo` berisi operasi pembalik (hapus baris baru, kembalikan nilai lama, atau sisipkan ulang baris yang dihapus dengan id yang sama).
+
+Argumen yang sudah diresolusi (`resolved`) inilah yang nanti disimpan di `agent_actions.args`. `lib/agent/executor.ts` menyediakan `callTool`, `commitTool`, dan `undo`. `functionDeclarations()` mengubah skema Zod menjadi JSON Schema (`parametersJsonSchema`) untuk Gemini.
+
+Nominal boleh dikirim sebagai teks rupiah ("30rb") dan dikonversi ke integer. Waktu menerima `YYYY-MM-DD` (jam 12.00 WIB), `YYYY-MM-DDTHH:MM` (WIB), atau ISO lengkap.
+
+## D-36 · Tool yang butuh penalaran bahasa atau gambar
+**Status: Diputuskan**
+
+- `correct_writing` tidak memanggil Gemini dari dalam tool. Model menulis koreksinya sendiri lalu memanggil tool ini dengan `corrected`, `mistakes[]`, dan `score`, kemudian tool menyimpan `writing_submissions` dan memperbarui `mistake_patterns`. Parameter ini melengkapi SPEC (`text`, `kind`).
+- `explain_text` dan `start_practice` mengembalikan data pendukung (level, tujuan, pola kesalahan teratas, kata yang sudah dikenal, kosakata jatuh tempo). Penjelasan dan latihannya disusun model.
+- `read_receipt` membaca kolom `receipts.extracted`. Pengisiannya oleh Gemini Vision dikerjakan di fase Struk.
+
+## D-37 · Aturan resolusi dan tebakan
+**Status: Diputuskan**
+
+- Urutan pencocokan nama: id persis, nama atau alias persis, awalan, mengandung, lalu semua kata kueri. Lebih dari satu kandidat di satu tingkat menghasilkan galat dengan `candidates`, supaya agen bertanya, bukan menebak.
+- Memori `alias` dicek sebelum nama akun, kategori, dan mata kuliah. Kategori transaksi: memori `merchant_rule`, kategori yang disebut, merchant, lalu kata di catatan, dengan cadangan "Lainnya" yang ditandai meragukan.
+- Akun yang tidak disebut: akun yang paling sering dipakai untuk kategori itu (SPEC 6.5), ditandai `doubtful: ['account']` untuk kartu kuning.
+- Mata kuliah semester aktif diutamakan. Proyek riset yang tidak disebut memakai proyek aktif pertama.
+- Ra pengurai lokal (D-32) kini menyimpan lewat registry yang sama, sehingga transaksi yang disetujui tercatat dengan `source = 'agent'`. Dari klien, `undoRa` hanya menerima operasi hapus. Undo yang lebih luas berjalan dari payload tersimpan di server pada Fase 3.
