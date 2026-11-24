@@ -5,7 +5,11 @@ export type { Content };
 export type FunctionCallOut = { id?: string; name: string; args: Record<string, unknown> };
 export type ModelTurn = { content: Content; functionCalls: FunctionCallOut[]; text: string };
 /** `json`: JSON Schema untuk output terstruktur (mis. ekstraksi struk). Bila diisi, jawaban model berupa teks JSON. */
-export type ModelRequest = { system: string; contents: Content[]; tools: FunctionDeclaration[]; signal?: AbortSignal; json?: unknown };
+export type ModelRequest = {
+  system: string; contents: Content[]; tools: FunctionDeclaration[]; signal?: AbortSignal; json?: unknown;
+  /** Ganti tingkat berpikir untuk permintaan ini saja (mis. transkripsi: minimal). */
+  thinking?: ThinkingLevel;
+};
 
 export interface AgentModel {
   readonly name: string;
@@ -106,7 +110,8 @@ export class GeminiModel implements AgentModel {
           temperature: req.json ? 0 : 0.2,
           abortSignal: req.signal,
           automaticFunctionCalling: { disable: true },
-          ...(this.usesThinkingLevel(model) ? { thinkingConfig: { thinkingLevel: this.thinkingLevel.toUpperCase() as GenaiThinkingLevel } } : {}),
+          ...(this.usesThinkingLevel(model) && (req.thinking ?? this.thinkingLevel) !== 'off'
+            ? { thinkingConfig: { thinkingLevel: (req.thinking ?? this.thinkingLevel).toUpperCase() as GenaiThinkingLevel } } : {}),
         },
       });
       // Konten model dikembalikan utuh (termasuk thoughtSignature) agar riwayat sah untuk giliran berikutnya.

@@ -77,6 +77,10 @@ describe('tingkat berpikir', () => {
     await call('t1');
     expect((bodies.get('t1')![0].generationConfig as Record<string, unknown>).thinkingConfig).toEqual({ thinkingLevel: 'LOW' });
   });
+  it('override per permintaan: thinking minimal', async () => {
+    await new GeminiModel({ apiKey: 'k', model: 't3', baseUrl: base }).generate({ system: 's', contents: [{ role: 'user', parts: [{ text: 'hi' }] }], tools: [], thinking: 'minimal' });
+    expect((bodies.get('t3')![0].generationConfig as Record<string, unknown>).thinkingConfig).toEqual({ thinkingLevel: 'MINIMAL' });
+  });
   it('off: tidak dikirim', async () => {
     await call('t2', base, 'off');
     expect((bodies.get('t2')![0].generationConfig as Record<string, unknown> | undefined)?.thinkingConfig).toBeUndefined();

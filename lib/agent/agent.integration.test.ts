@@ -142,12 +142,14 @@ describe.skipIf(!run)('loop agen dengan model palsu', () => {
     const card = r1.proposed_actions[0];
     expect(card.chips[0].doubtful).toBe(true);
     const target = cat['Rumah Tangga'] ?? Object.values(cat).find((id) => id !== card.chips[0].value)!;
-    const ok = await approveActions(ctx(), [card.id], { [card.id]: { category: target, account: acc.Dana } });
+    // akun koreksi harus berbeda dari tebakan awal, kalau tidak memang tidak ada yang dikoreksi
+    const fixName = card.chips[1].value === acc.Dana ? 'BCA' : 'Dana';
+    const ok = await approveActions(ctx(), [card.id], { [card.id]: { category: target, account: acc[fixName] } });
     expect(ok.ok).toBe(true);
     const { data: mem } = await db.from('agent_memory').select('kind,key,value').eq('key', 'pak ujang');
     expect(mem).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'merchant_rule', value: { category_id: target } }),
-      expect.objectContaining({ kind: 'correction', value: { account_id: acc.Dana } }),
+      expect.objectContaining({ kind: 'correction', value: { account_id: acc[fixName] } }),
     ]));
 
     // permintaan berikutnya: memori masuk konteks sistem, dan tool memakai kategori serta akun hasil koreksi
@@ -156,7 +158,7 @@ describe.skipIf(!run)('loop agen dengan model palsu', () => {
     expect(second.requests[0].system).toMatch(/merchant_rule "pak ujang"/);
     const c2 = r2.proposed_actions[0];
     expect(c2.chips[0]).toMatchObject({ value: target, doubtful: false });
-    expect(c2.chips[1]).toMatchObject({ label: 'Dana', doubtful: false });
+    expect(c2.chips[1]).toMatchObject({ label: fixName, doubtful: false });
     // riwayat percakapan sebelumnya ikut terkirim
     expect(second.requests[0].contents[0].parts?.[0].text).toBe('titip pak ujang 15rb');
     await rejectActions(ctx(), [c2.id]);
@@ -212,29 +214,41 @@ describe.skipIf(!run)('loop agen dengan model palsu', () => {
     expect(r.lines?.length).toBeGreaterThan(0);
   });
 
-  it('pesan suara: audio dikirim mentah ke Gemini, satu rekaman jadi beberapa aksi, transkrip disimpan tanpa audio', async () => {
+  it('pesan suara: Gemini mendengar sekali, transkrip diproses seperti teks, beberapa aksi, audio tidak disimpan', async () => {
     const wav = Buffer.from('RIFF....WAVEfmt uji-suara');
+    const said = 'tadi beli bensin tiga puluh ribu pakai gopay terus makan siang dua lima ribu cash';
     const model = new FakeModel((req, step) => {
-      if (step === 0) return { calls: [
+      if (step === 0) return { text: JSON.stringify({ transcript: said, clear: true }) };
+      if (step === 1) return { calls: [
         { name: 'add_transaction', args: { kind: 'expense', amount: 30000, account: 'gopay', note: 'bensin' } },
         { name: 'add_transaction', args: { kind: 'expense', amount: 25000, account: 'cash', note: 'makan siang', category: 'Makan' } },
       ] };
-      return { text: 'Transkrip: tadi beli bensin tiga puluh ribu pakai gopay terus makan siang dua lima ribu cash\nOke, ada 2 pengeluaran. Cek dulu ya.' };
+      return { text: 'Oke, ada 2 pengeluaran. Cek dulu ya.' };
     });
     const r = await handleMessage(ctx(), model, '', null, { audio: { data: wav, mime: 'audio/wav' } });
-    const first = model.requests[0];
-    const audioPart = first.contents.at(-1)!.parts!.find((p) => p.inlineData);
-    expect(audioPart?.inlineData).toEqual({ mimeType: 'audio/wav', data: wav.toString('base64') });
-    expect(first.system).toMatch(/PESAN SUARA/);
+    // langkah 1: transkripsi ringan dengan audio, tanpa tool
+    expect(model.requests[0].contents[0].parts?.[0].inlineData).toEqual({ mimeType: 'audio/wav', data: wav.toString('base64') });
+    expect(model.requests[0].tools).toHaveLength(0);
+    // langkah berikutnya: loop agen biasa, audio tidak dikirim ulang
+    for (const req of model.requests.slice(1)) expect(JSON.stringify(req.contents)).not.toContain(wav.toString('base64'));
+    expect(model.requests[1].contents.at(-1)!.parts![0].text).toBe(`[pesan suara] ${said}`);
     expect(r.proposed_actions).toHaveLength(2);
-    expect(r.transcript).toBe('tadi beli bensin tiga puluh ribu pakai gopay terus makan siang dua lima ribu cash');
+    expect(r.transcript).toBe(said);
     expect(r.reply).toBe('Oke, ada 2 pengeluaran. Cek dulu ya.');
     const { data: conv } = await db.from('agent_conversations').select('channel').eq('id', r.conversation_id).single();
     expect(conv!.channel).toBe('voice');
     const { data: msgs } = await db.from('agent_messages').select('role,content').eq('conversation_id', r.conversation_id).order('created_at');
     expect(JSON.stringify(msgs)).not.toContain(wav.toString('base64'));
-    expect((msgs![0].content as { parts: { text: string }[] }).parts[0].text).toBe('[pesan suara] tadi beli bensin tiga puluh ribu pakai gopay terus makan siang dua lima ribu cash');
+    expect((msgs![0].content as { parts: { text: string }[] }).parts[0].text).toBe(`[pesan suara] ${said}`);
     await rejectActions(ctx(), r.proposed_actions.map((a) => a.id));
+  });
+
+  it('pesan suara tidak jelas: tidak ada usulan, diminta mengulang', async () => {
+    const model = new FakeModel(() => ({ text: '{"transcript":"","clear":false}' }));
+    const r = await handleMessage(ctx(), model, '', null, { audio: { data: Buffer.from('sunyi'), mime: 'audio/wav' } });
+    expect(model.requests).toHaveLength(1);
+    expect(r).toMatchObject({ proposed_actions: [], transcript: null, offline: null });
+    expect(r.reply).toMatch(/kurang jelas/);
   });
 
   it('pesan suara saat Gemini tidak tersedia: tidak ada usulan, diminta mengetik', async () => {
