@@ -17,7 +17,7 @@ Baca seluruhnya sebelum mulai:
 - Mulai dari Fase 0 (audit). Jangan menulis fitur sebelum `docs/AUDIT.md` selesai.
 - Jangan merusak fitur yang sudah berjalan. Jalankan build dan cek sebelum commit.
 - Model AI di dalam app adalah Gemini. Jangan mengganti ke penyedia lain.
-- Agen di dalam app tidak boleh mengubah data tanpa konfirmasi pengguna (lihat `SPEC.md` 6.3 dan 6.4).
+- Agen di dalam app tidak boleh mengubah data tanpa konfirmasi pengguna (lihat `SPEC.md` 6.3 dan 6.4). Semua perubahan oleh Ra lewat registry `lib/agent/tools` (prepare lalu commit), bukan query langsung.
 - UI berbahasa Indonesia dan mengikuti `docs/DESIGN.md` (token warna, komponen, nama Kompas dan Ra). Kode, variabel, dan nama tabel berbahasa Inggris.
 - Nominal uang disimpan sebagai integer rupiah. Zona waktu Asia/Jakarta.
 - Rahasia hanya di server dan `.env`. Jangan commit `.env`.
@@ -31,6 +31,7 @@ Baca seluruhnya sebelum mulai:
 - Typecheck: `npm run typecheck`
 - Unit test: `npm test`
 - Uji migrasi, RLS, dan saldo di PostgreSQL kosong: `PGURL=postgres://... npm run test:db`
+- Uji integrasi tools agen di Supabase lokal: `KOMPAS_IT_URL=http://127.0.0.1:54321 KOMPAS_IT_ANON=... KOMPAS_IT_SERVICE=... npm run test:it`
 - Migrasi ke Supabase: `npx supabase db push` (setelah `npx supabase link`)
 - Supabase lokal: `npx supabase start` (butuh Docker)
 - Migrasi baru: tambah file berurutan di `supabase/migrations/`, jangan ubah file yang sudah dijalankan di production.

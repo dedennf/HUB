@@ -774,10 +774,10 @@ Setiap fase selesai jika semua kriteria terpenuhi, build lolos, dan preview Verc
 - [x] Input di semua modul: tugas, mata kuliah, jadwal, materi, semester, acara, libur, riset, tagihan dan Bayar, utang dan cicilan, budget, target tabungan, biaya sejati, investasi, kategori
 - [x] Input cepat lewat Ra dengan pengurai lokal (kartu usulan, Setujui, Batalkan), Cocokkan saldo, kalender bulan dan minggu, ekspor cadangan JSON dan CSV
 
-**Fase 2 · Tools dan API**
-- [ ] Registry tools lengkap Bagian 6.8 dengan validasi Zod
-- [ ] Resolusi nama ke id (akun, mata kuliah, proyek, tugas) termasuk alias
-- [ ] Update saldo otomatis dan konsisten saat tambah, ubah, hapus, undo
+**Fase 2 · Tools dan API** (D-35 sampai D-37)
+- [x] Registry tools lengkap Bagian 6.8 dengan validasi Zod (38 tool, `lib/agent/tools`, deklarasi JSON Schema untuk Gemini)
+- [x] Resolusi nama ke id (akun, mata kuliah, proyek, tugas, kategori, target, investasi, otomasi) termasuk alias dan memori, kandidat bila ambigu
+- [x] Update saldo otomatis dan konsisten saat tambah, ubah, hapus, undo (uji integrasi Supabase lokal, `npm run test:it`)
 
 **Fase 3 · Inti Agen + Input Teks**
 - [ ] Loop agen, konteks sistem, snapshot, memori
