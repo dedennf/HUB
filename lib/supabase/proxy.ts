@@ -1,7 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/auth/'];
+// /api/cron dilindungi CRON_SECRET sendiri (dipanggil pg_cron dan Vercel Cron tanpa sesi)
+const PUBLIC_PATHS = ['/login', '/auth/', '/api/cron/'];
 
 /** Menyegarkan sesi Supabase di setiap permintaan dan mengarahkan tamu ke /login. */
 export async function updateSession(request: NextRequest) {

@@ -1,6 +1,7 @@
 // Tools otomasi dan memori (SPEC 6.8, 8.2).
 import { z } from 'zod';
 import { normalize, resolveAccount, resolveAutomation, resolveCategory, resolveCourse } from '../resolve';
+import { describeAction, describeTrigger } from '@/lib/automation/describe';
 import { deleteRow, insertRow, isErr, pick, updateRow } from './common';
 import { fail, type ReadTool, type UndoOp, type WriteTool } from './types';
 
@@ -50,10 +51,16 @@ export const createAutomation: WriteTool<typeof createParams, Record<string, unk
       if (typeof args.category === 'string') { const r = await resolveCategory(ctx.db, args.category, args.kind === 'income' ? 'income' : 'expense'); if (r.kind === 'found') args.category_id = r.id; }
       action.args = args;
     }
-    const when = a.trigger.type === 'schedule' ? `jadwal "${a.trigger.cron}"` : a.trigger.type === 'event' ? `saat ${a.trigger.event}` : `saat saldo ${a.trigger.account} ${a.trigger.op} ${a.trigger.value}`;
-    const what = a.action.type === 'notify' ? `kirim notifikasi "${a.action.title}"` : a.action.type === 'agent_task' ? `Ra: ${a.action.instruction}` : `catat transaksi`;
+    const labels: string[] = [];
+    if (a.action.type === 'add_transaction') {
+      const args = action.args as Record<string, unknown>;
+      if (args.category_id) { const { data } = await ctx.db.from('categories').select('name').eq('id', String(args.category_id)).maybeSingle(); if (data) labels.push(data.name); }
+      if (args.account_id) { const { data } = await ctx.db.from('accounts').select('name').eq('id', String(args.account_id)).maybeSingle(); if (data) labels.push(data.name); }
+    }
+    const when = describeTrigger(a.trigger as Record<string, unknown>);
+    const what = describeAction(action) + (labels.length ? `, ${labels.join(', ')}` : '');
     return {
-      ok: true, summary: `Otomasi "${a.name}": ${when} → ${what}. Otomatis tanpa konfirmasi: ${a.auto_write ? 'Ya' : 'Tidak'}`,
+      ok: true, summary: `${a.name} · ${when} → ${what} · Otomatis tanpa konfirmasi: ${a.auto_write ? 'Ya' : 'Tidak'}`,
       resolved: { name: a.name, trigger: a.trigger, conditions: a.conditions ?? [], action, mode: a.mode, auto_write: !!a.auto_write, is_enabled: true },
     };
   },

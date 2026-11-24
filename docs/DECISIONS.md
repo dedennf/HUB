@@ -489,3 +489,37 @@ Tiga lapis pengaman:
 3. **Prompt transkripsi**: tema keuangan dihapus. Model diminta hanya menulis ucapan manusia yang terdengar, dilarang mengarang, dan mengisi `clear = false` untuk sunyi, bising, atau musik.
 
 `/api/agent/diagnose` kini memakai 1 detik nada 440 Hz (bukan ucapan) sebagai uji transkripsi. Bila model mengembalikan transkrip, hasilnya ditandai `halusinasi`.
+
+---
+
+# Keputusan Fase 6 · Otomasi dan Notifikasi
+
+## D-50 · Penjadwal berjalan sebagai pemilik, isi otomasi disusun kode
+**Status: Diputuskan**
+
+- **Sesi pemilik**: `/api/cron/tick` tidak memakai service role untuk membaca dan menulis data. Service role hanya membuat tautan masuk untuk `OWNER_EMAIL` (`auth.admin.generateLink`, tanpa email terkirim). Tautan itu langsung ditukar jadi sesi (`verifyOtp`) dan sesinya ditutup setelah tick. Dengan cara ini RLS, `user_id` bawaan, dan seluruh registry tools berlaku persis seperti saat pemilik memakai app, tanpa jalur kode kedua yang melewati RLS.
+- **Penjadwal**: pg_cron memanggil tick tiap 5 menit lewat pg_net. URL dan `CRON_SECRET` disimpan di Supabase Vault (`docs/cron-setup.sql`), bukan di migrasi atau kode, karena nilainya berbeda per lingkungan dan bersifat rahasia. Vercel Cron Hobby hanya boleh sekali sehari, jadi `vercel.json` memakainya sebagai cadangan harian (23.05 UTC = 06.05 WIB). `proxy.ts` mengecualikan `/api/cron/` dari pengalihan login karena rute itu dilindungi `CRON_SECRET` sendiri (perbandingan waktu-konstan).
+- **Aman dari eksekusi ganda (SPEC 8.3)**: `claim_due_automations` dan `claim_automation_events` mengambil baris dengan `for update skip locked`. Otomasi terjadwal diberi sewa 10 menit (next_run_at maju), peristiwa langsung ditandai diproses. Dua tick bersamaan mendapat himpunan yang terpisah (diuji).
+- **Otomasi bawaan (SPEC 8.5)**: 12 otomasi dipasang otomatis di tick pertama (kolom `system_key`), jadwalnya mengikuti jam di Pengaturan. Yang bermode "agent" (briefing, rekap, saran slot, transaksi janggal, rekap mingguan, minggu padat) disusun kode dari data, bukan teks bebas Gemini. Alasannya: pasti, cepat, dan tidak memakan kuota Gemini yang terbukti sempit (D-42 sampai D-49). Batasan SPEC 8.1 tetap dipegang: mode agent hanya mengirim notifikasi atau usulan di `agent_actions` yang dikonfirmasi di Beranda.
+- **Tugas lewat tenggat**: otomasi bawaan "Tugas lewat tenggat" mengubah status tugas menjadi `overdue` tanpa konfirmasi, sesuai daftar SPEC 8.5. Ini perubahan status, bukan data baru.
+- **Peristiwa data**: pemicu database di `transactions`, `tasks`, `research_targets`, `vocab`, dan `bills` menulis ke `automation_events`, jadi semua jalur input (form, Ra, struk, suara, impor) tercakup. Lebih dari 20 peristiwa sejenis dalam satu tick dianggap impor massal dan dilewati. Transaksi yang terjadi lebih dari 2 hari lalu tidak memicu peringatan budget atau transaksi janggal.
+- **Riwayat jalan**: otomasi tiap 5 menit (pengingat tenggat, lewat tenggat, ambang saldo) hanya mencatat run yang menghasilkan sesuatu, supaya riwayat tidak terisi 288 baris kosong per hari.
+
+## D-51 · Aturan buatan pengguna
+**Status: Diputuskan**
+
+- `create_automation` tetap tool tulis biasa: kartu menampilkan aturan dalam bahasa manusia ("Tiap tanggal 5 jam 08.00 → Catat pengeluaran Rp150.000 dari GoPay, Pulsa & internet · Otomatis tanpa konfirmasi: Ya") dan baru tersimpan setelah disetujui.
+- Aksi `add_transaction` hanya ditulis langsung bila `mode = rule` dan `auto_write = true` (disetujui saat aturan dibuat). Selain itu menjadi usulan di Beranda. Transaksi dari otomasi tercatat `source = 'automation'`.
+- Pemicu ambang (`threshold`) dicek tiap tick, tapi paling banyak jalan sekali per hari selama kondisinya bertahan.
+- `agent_task` menjalankan loop agen (maks 4 langkah, 30 detik). Tool tulis tetap menjadi usulan. Tanpa Gemini, run dicatat dilewati.
+- Mengaktifkan ulang otomasi dari halaman Otomasi mengosongkan `next_run_at`, sehingga jadwalnya dihitung ulang dari saat itu, bukan langsung menembakkan jadwal yang terlewat.
+
+## D-52 · Notifikasi dan jam tenang
+**Status: Diputuskan**
+
+- Semua notifikasi disimpan di `notifications` (lonceng di Beranda, daftar di Saya → Notifikasi), lalu dikirim lewat Web Push (`web-push`, VAPID) ke semua perangkat. Langganan yang dibalas 404 atau 410 dihapus.
+- `dedupe_key` unik per pengguna mencegah pengingat yang sama terkirim dua kali (mis. `deadline:<id>:h1`, `briefing:<tanggal>`). Indeksnya unik biasa, bukan parsial, supaya bisa dipakai `upsert ... on conflict`. NULL tetap boleh banyak.
+- Jam tenang: notifikasi yang dibuat di dalam jam tenang diberi `deliver_after` = akhir jam tenang, lalu dikirim tick pertama setelahnya. Pengecualian SPEC 8.1: tenggat yang jatuh di dalam jam tenang itu sendiri tetap dikirim langsung.
+- Kunci VAPID dibaca saat runtime, bukan `process.env.NEXT_PUBLIC_*` literal yang ditanam Next saat build. Dengan begitu kunci yang diisi setelah build tetap terbaca.
+- Petunjuk iPhone (SPEC 9): Safari baru mendukung push untuk app yang ditambahkan ke Layar Utama. Halaman Notifikasi menampilkan langkahnya bila Safari di iPhone belum dalam mode standalone.
+- Usulan yang menunggu (dari otomasi maupun percakapan yang belum diputuskan, 7 hari terakhir) tampil sebagai kartu di Beranda dengan Setujui dan Tolak, menggantikan banner "N usulan" lama.

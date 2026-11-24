@@ -797,13 +797,13 @@ Setiap fase selesai jika semua kriteria terpenuhi, build lolos, dan preview Verc
 - [x] Transkrip tampil di riwayat (gelembung pesan suara dan `agent_messages`)
 - [ ] Berjalan di Chrome Android, Safari iPhone, dan browser laptop (diuji otomatis di Chromium laptop dan HP. Safari iPhone dan Chrome Android menunggu uji pemilik di perangkat asli)
 
-**Fase 6 · Otomasi + Notifikasi**
-- [ ] PWA, service worker, push subscription multi perangkat
-- [ ] `pg_cron` → `/api/cron/tick`, aman dari eksekusi ganda
-- [ ] Semua otomasi bawaan Bagian 8.5 berjalan
-- [ ] Membuat otomasi lewat agen dengan bahasa biasa
-- [ ] Halaman Otomasi dengan riwayat jalan
-- [ ] Jam tenang dihormati
+**Fase 6 · Otomasi + Notifikasi** (D-50 sampai D-52)
+- [ ] PWA, service worker, push subscription multi perangkat (kode, uji integrasi pengiriman, dan UI selesai. Berlangganan push di perangkat asli menunggu uji pemilik, headless Chromium tidak bisa memberi izin notifikasi)
+- [x] `pg_cron` → `/api/cron/tick`, aman dari eksekusi ganda (diuji di Supabase lokal: pg_cron + pg_net + Vault, klaim `for update skip locked`)
+- [x] Semua otomasi bawaan Bagian 8.5 berjalan (12 otomasi, isi disusun kode, D-50)
+- [x] Membuat otomasi lewat agen dengan bahasa biasa (ringkasan kartu seperti SPEC 8.4, aturan dijalankan mesin)
+- [x] Halaman Otomasi dengan riwayat jalan
+- [x] Jam tenang dihormati (ditunda ke akhir jam tenang, tenggat di dalam jam tenang tetap langsung)
 
 **Fase 7 · Bahasa Inggris**
 - [ ] Bank kosakata + review SM-2

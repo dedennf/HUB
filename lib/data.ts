@@ -99,7 +99,6 @@ async function count(q: PromiseLike<{ count: number | null; error: { message: st
   if (error) throw new Error(`Gagal memuat data: ${error.message}`);
   return c ?? 0;
 }
-export const countProposedActions = (s: Db) => count(s.from('agent_actions').select('id', { count: 'exact', head: true }).eq('status', 'proposed'));
 export const countUnreadNotifications = (s: Db) => count(s.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null));
 export const countDueVocab = (s: Db) => count(s.from('vocab').select('id', { count: 'exact', head: true }).lte('due_at', new Date().toISOString()));
 export const countVocab = (s: Db) => count(s.from('vocab').select('id', { count: 'exact', head: true }));
