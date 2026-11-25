@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { isOwnerEmail } from '@/lib/env';
 import { resolveSessionUser } from '@/lib/auth';
-import { availableModels, diagnose } from '@/lib/agent/diagnose';
+import { availableModels, diagnose, toneWav } from '@/lib/agent/diagnose';
+import { transcribeWithLive, wavToPcm16k } from '@/lib/live/transcribe';
 import { geminiConfig } from '@/lib/agent/model';
 import { diagnoseLive } from '@/lib/live/diagnose';
 import { liveConfig, liveModel } from '@/lib/live/config';
@@ -24,6 +25,14 @@ export async function GET() {
     const db = await createClient();
     const now = new Date();
     report.cases.push(await diagnoseLive(cfg.apiKey, live, await liveConfig(db, 'assistant', now, todayIso(now)), { baseUrl: cfg.baseUrl }));
+    // D-63: transkripsi pesan suara lewat Live (nada 1 detik, bukan ucapan: hasil kosong itu wajar)
+    const t0 = Date.now();
+    try {
+      const t = await transcribeWithLive({ apiKey: cfg.apiKey, model: live, pcm: wavToPcm16k(toneWav(1, 440))!, baseUrl: cfg.baseUrl, timeoutMs: 15_000 });
+      report.cases.push({ model: live, test: 'transkripsi pesan suara (Live)', ok: true, ms: Date.now() - t0, reply: t ? `"${t.slice(0, 80)}"` : '(tidak ada ucapan, sesuai harapan)' });
+    } catch (e) {
+      report.cases.push({ model: live, test: 'transkripsi pesan suara (Live)', ok: false, ms: Date.now() - t0, reason: 'galat', detail: (e as Error).message.slice(0, 300) });
+    }
   }
   console.log('[agent] diagnosa Gemini:', JSON.stringify(report));
   return NextResponse.json(report, { headers: { 'Cache-Control': 'no-store' } });

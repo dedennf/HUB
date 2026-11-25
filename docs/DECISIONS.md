@@ -631,3 +631,44 @@ Konten dari Gemini (kata, materi grammar) disimpan di baris hari itu. Membuka ul
 **Pengaturan baru.** `english_target_band` (bawaan 6,5) dan `english_test_date` (opsional). Tanggal tes yang dikosongkan menghapus baris pengaturannya, karena kolom `value` wajib diisi.
 
 Alat lama (Baca jurnal, Tulis bebas, Bank kata, Ngobrol bebas, English Mode) tetap ada di bagian "Alat lain".
+
+## D-61 · Logo akun dan nomor rekening siap salin
+**Status: Diputuskan**
+
+Kolom baru di `accounts` (migrasi 0018):
+- `account_number`: nomor rekening atau nomor HP e-wallet.
+- `account_holder`: nama pemilik.
+- `logo_domain`: opsional, untuk akun yang tidak dikenali otomatis.
+
+Nomor tampil dengan tombol Salin di tiga tempat: Beranda, Keuangan, dan detail akun. Ada dua pilihan salin: hanya nomor, atau teks lengkap "BCA 1234567890 a.n. Nama". Tool `get_balances` juga mengembalikan nomor dan atas nama, jadi Ra bisa menjawab "nomor rekening BCA-ku berapa".
+
+Logo diambil dari ikon situs resmi lewat layanan favicon Google (`lib/brands.ts` mencocokkan nama akun dengan domain bank, e-wallet, atau aplikasi investasi). Tidak ada berkas logo merek yang disimpan di repo. Bila ikon gagal dimuat, terlalu kecil, atau tidak muncul dalam 4 detik, tampilan kembali ke lingkaran inisial. Konsekuensinya, Google mengetahui domain bank mana yang ikonnya diminta oleh browser pengguna.
+
+## D-62 · Beranda: aman dibelanjakan, IELTS hari ini, nomor rekening
+**Status: Diputuskan**
+
+Beranda mendapat tiga kartu baru di bawah briefing:
+- **Aman dibelanjakan hari ini** (`safeToSpend`): sisa budget bulanan semua kategori ber-budget sampai kemarin dibagi sisa hari termasuk hari ini, lalu dikurangi belanja ber-budget hari ini.
+- **IELTS hari ini**: progres 4 langkah sesi dan perkiraan band dibanding target.
+- **Nomor rekening** (D-61).
+
+Progres skripsi kini tampil juga di HP, tidak hanya di laptop.
+
+## D-63 · Pesan suara ditranskripsi model Gemini Live
+**Status: Diputuskan**
+
+Model teks (terutama varian lite) sering salah menuliskan ucapan campuran Indonesia-Inggris. Bila `GEMINI_LIVE_MODEL` diisi dan rekaman berupa WAV 16 kHz mono, server membuka sesi Live singkat dengan `inputAudioTranscription` (`lib/live/transcribe.ts`). Urutannya:
+1. Server mengirim PCM per 100 ms, ditambah 700 ms hening dan `audioStreamEnd`.
+2. Server mengumpulkan transkrip input, lalu menutup sesi. Jawaban suara model diabaikan.
+3. Transkrip diproses loop agen seperti teks biasa. Tool dan kartu konfirmasi tidak berubah.
+
+Bila sesi Live gagal, transkripsi kembali ke model teks seperti D-48. Diagnosa menambahkan uji "transkripsi pesan suara (Live)".
+
+## D-64 · Notifikasi: diagnosa dan daftar ulang otomatis
+**Status: Diputuskan**
+
+Penyebab push tidak sampai sulit dilihat dari UI. Perbaikannya:
+- `VAPID_SUBJECT` dinormalkan, misalnya "mail to x@y" atau "x@y" menjadi "mailto:x@y". Kunci yang tidak valid dilaporkan jelas, tidak lagi menggagalkan semua pengiriman diam-diam.
+- Tombol uji menampilkan galat pengiriman per perangkat. Galat 403 diberi keterangan bahwa kunci VAPID berubah.
+- Perangkat yang terdaftar dengan kunci VAPID lama didaftarkan ulang otomatis saat halaman Notifikasi dibuka. Ada juga tombol "Daftarkan ulang".
+- `/api/cron/tick` menyimpan `cron_last_tick` di settings. Halaman Notifikasi menampilkan status kunci VAPID, jumlah perangkat, dan kapan penjadwal terakhir jalan, dengan peringatan bila lebih dari 20 menit atau belum pernah.

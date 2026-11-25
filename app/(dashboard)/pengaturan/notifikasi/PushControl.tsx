@@ -10,6 +10,12 @@ function b64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
 }
+/** Bandingkan kunci langganan dengan kunci server. null = browser tidak memberi tahu. */
+function sameKey(buf: ArrayBuffer | null, b64: string): boolean | null {
+  if (!buf) return null;
+  const a = new Uint8Array(buf), b = b64ToBytes(b64);
+  return a.length === b.length && a.every((x, i) => x === b[i]);
+}
 const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
 const standalone = () => window.matchMedia('(display-mode: standalone)').matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
 const deviceLabel = () => {
@@ -24,6 +30,35 @@ export function PushControl({ vapidKey }: { vapidKey: string }) {
   const [state, setState] = useState<State>('checking');
   const [msg, setMsg] = useState<string | null>(null);
 
+  const save = async (sub: PushSubscription) => {
+    const res = await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...sub.toJSON(), device_label: deviceLabel() }) });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+  };
+
+  /** Daftarkan perangkat ini. renew = buang langganan lama dulu (kunci berubah atau push gagal terus). */
+  const subscribe = async (renew = false) => {
+    setState('busy'); setMsg(null);
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { setState(perm === 'denied' ? 'denied' : 'off'); return; }
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      if (renew) {
+        const old = await reg.pushManager.getSubscription();
+        if (old) {
+          await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: old.endpoint }) }).catch(() => {});
+          await old.unsubscribe().catch(() => {});
+        }
+      }
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(vapidKey) });
+      await save(sub);
+      setState('on'); setMsg(renew ? 'Perangkat ini didaftarkan ulang. Coba kirim notifikasi uji.' : 'Notifikasi aktif di perangkat ini.');
+    } catch (e) {
+      setState('off'); setMsg(`Gagal mengaktifkan: ${(e as Error).message}`);
+    }
+  };
+  const enable = () => subscribe(false);
+
   useEffect(() => {
     (async () => {
       if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
@@ -31,25 +66,20 @@ export function PushControl({ vapidKey }: { vapidKey: string }) {
       }
       if (Notification.permission === 'denied') { setState('denied'); return; }
       const reg = await navigator.serviceWorker.getRegistration('/');
-      setState((await reg?.pushManager.getSubscription()) ? 'on' : 'off');
+      const sub = await reg?.pushManager.getSubscription();
+      if (!sub) { setState('off'); return; }
+      // kunci VAPID di server berubah: langganan lama pasti ditolak layanan push, jadi daftarkan ulang diam-diam
+      if (vapidKey && sameKey(sub.options.applicationServerKey, vapidKey) === false && Notification.permission === 'granted') {
+        await subscribe(true);
+        return;
+      }
+      // pastikan server juga mengenal langganan ini (mis. setelah database dipulihkan)
+      await save(sub).catch(() => {});
+      setState('on');
     })().catch(() => setState('unsupported'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const enable = async () => {
-    setState('busy'); setMsg(null);
-    try {
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') { setState(perm === 'denied' ? 'denied' : 'off'); return; }
-      const reg = await navigator.serviceWorker.register('/sw.js');
-      await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(vapidKey) });
-      const res = await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...sub.toJSON(), device_label: deviceLabel() }) });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
-      setState('on'); setMsg('Notifikasi aktif di perangkat ini.');
-    } catch (e) {
-      setState('off'); setMsg(`Gagal mengaktifkan: ${(e as Error).message}`);
-    }
-  };
   const disable = async () => {
     setState('busy'); setMsg(null);
     const reg = await navigator.serviceWorker.getRegistration('/');
@@ -64,7 +94,7 @@ export function PushControl({ vapidKey }: { vapidKey: string }) {
     setMsg('Mengirim...');
     const res = await fetch('/api/push/test', { method: 'POST' });
     const data = await res.json().catch(() => ({}));
-    setMsg(res.ok ? `Terkirim ke ${data.devices ?? 0} perangkat.` : data.error ?? 'Gagal mengirim.');
+    setMsg(res.ok ? `Terkirim ke ${data.devices ?? 0} perangkat. Kalau tidak muncul, cek izin notifikasi browser dan mode Fokus atau Jangan Ganggu di perangkat.` : data.error ?? 'Gagal mengirim.');
   };
 
   return (
@@ -81,6 +111,7 @@ export function PushControl({ vapidKey }: { vapidKey: string }) {
         {(state === 'off' || state === 'busy') && vapidKey && <button type="button" className="btn btn-primary" onClick={enable} disabled={state === 'busy'}>{state === 'busy' ? 'Menyiapkan...' : 'Aktifkan notifikasi'}</button>}
         {state === 'on' && <>
           <button type="button" className="btn btn-primary" onClick={test}>Kirim notifikasi uji</button>
+          <button type="button" className="btn" onClick={() => void subscribe(true)}>Daftarkan ulang</button>
           <button type="button" className="btn" onClick={disable}>Matikan di perangkat ini</button>
         </>}
       </div>

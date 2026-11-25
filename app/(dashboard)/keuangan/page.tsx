@@ -17,6 +17,7 @@ import { accountChange, budgetLines, cashflow, daysLeftInMonth } from '@/lib/fin
 import { formatDayMonth, formatDayShort, formatMonthYear, formatRp, formatRpShort } from '@/lib/format';
 import { diffDays, todayIso, zonedParts } from '@/lib/time';
 import type { Account, Category, Transaction } from '@/lib/types';
+import { QuickAccounts } from '@/components/home/QuickAccounts';
 import { AccountForm } from './AccountForm';
 import { TransactionForm } from './TransactionForm';
 
@@ -84,6 +85,7 @@ async function Ringkasan({ accounts, today }: { accounts: Account[]; today: stri
         ) : <div className="card"><EmptyState>Belum ada akun. Tambahkan di bawah atau impor data lama.</EmptyState></div>}
         <p className="mt-2 px-1 text-[12px] text-muted">Perubahan dihitung sejak awal bulan.</p>
       </Section>
+      {active.some((a) => a.account_number) && <QuickAccounts accounts={active} />}
       <Link href="/keuangan?tab=rencana" className="card flex min-h-[64px] items-center gap-3 p-4 hover:ring-1 hover:ring-accent">
         <span className="min-w-0 flex-1">
           <span className="block text-[14px] font-semibold">Rencana keuangan</span>

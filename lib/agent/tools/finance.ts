@@ -55,10 +55,10 @@ async function mostUsedAccount(ctx: ToolCtx, categoryId: string | null): Promise
 
 export const getBalances: ReadTool<z.ZodObject<{ account_ids: z.ZodOptional<z.ZodArray<z.ZodString>> }>> = {
   name: 'get_balances', module: 'finance', permission: 'read',
-  description: 'Lihat saldo akun (bank, dompet digital, tunai, investasi) beserta total uang siap pakai. Kosongkan account_ids untuk semua akun. Nama akun atau alias boleh dipakai.',
+  description: 'Lihat saldo akun (bank, dompet digital, tunai, investasi) beserta total uang siap pakai, serta nomor rekening dan atas nama bila sudah diisi. Kosongkan account_ids untuk semua akun. Nama akun atau alias boleh dipakai.',
   parameters: z.object({ account_ids: z.array(z.string()).optional().describe('Nama, alias, atau id akun. Kosong = semua.') }),
   async run(ctx, { account_ids }) {
-    const { data } = await ctx.db.from('accounts').select('id,name,type,balance,aliases').eq('is_archived', false).order('sort_order');
+    const { data } = await ctx.db.from('accounts').select('id,name,type,balance,aliases,account_number,account_holder').eq('is_archived', false).order('sort_order');
     let list = data ?? [];
     if (account_ids?.length) {
       const ids: string[] = [];
@@ -70,7 +70,7 @@ export const getBalances: ReadTool<z.ZodObject<{ account_ids: z.ZodOptional<z.Zo
       list = list.filter((a) => ids.includes(a.id));
     }
     const ready = (data ?? []).filter((a) => a.type !== 'investment').reduce((n, a) => n + a.balance, 0);
-    return { ok: true, data: { accounts: list.map((a) => ({ id: a.id, name: a.name, type: a.type, balance: a.balance })), ready_money: ready } };
+    return { ok: true, data: { accounts: list.map((a) => ({ id: a.id, name: a.name, type: a.type, balance: a.balance, ...(a.account_number ? { account_number: a.account_number, account_holder: a.account_holder } : {}) })), ready_money: ready } };
   },
 };
 

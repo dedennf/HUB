@@ -9,13 +9,19 @@ import { PendingActions } from '@/components/ra/PendingActions';
 import { cardFor, type ActionRow } from '@/lib/agent/cards';
 import { loadLookups } from '@/lib/agent/service';
 import { QuickActions } from '@/components/ui/QuickActions';
+import { EnglishCard } from '@/components/home/EnglishCard';
+import { QuickAccounts } from '@/components/home/QuickAccounts';
+import { SafeSpendCard } from '@/components/home/SafeSpendCard';
+import { skillFor, type SessionStep, type Skill } from '@/lib/english/ielts';
+import { bandSummary } from '@/lib/english/ielts-store';
+import { loadProfile } from '@/lib/english/store';
 import { EmptyState } from '@/components/ui/Section';
 import { buildCalendarItems } from '@/lib/calendar';
 import {
-  countDueVocab, countUnreadNotifications, db, getAccounts, getCalendarSources, getCourses, getDebts,
+  countDueVocab, countUnreadNotifications, db, getAccounts, getCalendarSources, getCategories, getCourses, getDebts,
   getInvestments, getResearchProjects, getSettings, getTransactionsSince,
 } from '@/lib/data';
-import { netWorth, netWorthChangeThisMonth, RANGES, readyMoney, readyMoneySeries, type RangeKey } from '@/lib/finance';
+import { netWorth, netWorthChangeThisMonth, RANGES, readyMoney, readyMoneySeries, safeToSpend, type RangeKey } from '@/lib/finance';
 import { formatDayShort, formatRpShort, formatTime, greeting } from '@/lib/format';
 import { summarizeProject } from '@/lib/research';
 import { readText } from '@/lib/settings';
@@ -35,9 +41,10 @@ export default async function BerandaPage() {
   const now = new Date();
   const today = todayIso(now);
   const s = await db();
-  const [accounts, investments, debts, sources, courses, txs, projects, pending, unread, dueVocab, settings] = await Promise.all([
+  const [accounts, investments, debts, sources, courses, txs, projects, pending, unread, dueVocab, settings, categories, english, bands, { data: day }] = await Promise.all([
     getAccounts(s), getInvestments(s), getDebts(s), getCalendarSources(s), getCourses(s), getTransactionsSince(s, addDays(today, -365)),
     getResearchProjects(s), loadPending(s, today), countUnreadNotifications(s), countDueVocab(s), getSettings(s, ['profile_name']),
+    getCategories(s), loadProfile(s), bandSummary(s, today), s.from('english_days').select('done,skill').eq('day', today).maybeSingle(),
   ]);
 
   const ready = readyMoney(accounts);
@@ -65,8 +72,10 @@ export default async function BerandaPage() {
       const when = d < 0 ? `lewat ${-d} hari` : d === 0 ? 'jatuh tempo hari ini' : `jatuh tempo ${d} hari lagi`;
       return { key: b.id, color: 'bill' as const, text: `${b.name} ${formatRpShort(b.amount)} ${when}`, action: { label: 'Bayar', href: `/keuangan/tagihan/${b.id}/bayar` } };
     }),
-    ...(dueVocab > 0 ? [{ key: 'vocab', color: 'study' as const, text: `${dueVocab} kosakata siap diulang`, action: { label: 'Ulang', href: '/bahasa' } }] : []),
+    ...(dueVocab > 0 ? [{ key: 'vocab', color: 'study' as const, text: `${dueVocab} kosakata siap diulang`, action: { label: 'Ulang', href: '/bahasa/sesi' } }] : []),
   ];
+
+  const safe = safeToSpend(categories, monthTxs, today, (t) => zonedParts(t.occurred_at).date);
 
   const upcoming = openTasks.filter((t) => zonedParts(t.due_at!).date >= today).sort((a, b) => a.due_at!.localeCompare(b.due_at!)).slice(0, 3);
   const research = summarizeProject(projects, sources.targets, sources.supervisions, today);
@@ -119,11 +128,15 @@ export default async function BerandaPage() {
 
       {pending.cards.length > 0 && <PendingActions cards={pending.cards} lookups={pending.lookups} />}
 
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-5">
+        <SafeSpendCard s={safe} />
+        <EnglishCard done={(day?.done ?? {}) as Partial<Record<SessionStep, boolean>>} skill={(day?.skill as Skill | undefined) ?? skillFor(today)} band={bands.overall} target={english.targetBand} />
+        <QuickAccounts accounts={accounts} compact />
+      </div>
+
       {research && (
-        <div className="hidden lg:block">
-          <ProgressCard title={research.project.title} percent={research.percent} href="/riset"
-            detail={`${research.done} dari ${research.total} target${research.nextSupervision ? ` · bimbingan berikutnya ${formatDayShort(research.nextSupervision)}` : ''}`} />
-        </div>
+        <ProgressCard title={research.project.title} percent={research.percent} href="/riset"
+          detail={`${research.done} dari ${research.total} target${research.nextSupervision ? ` · bimbingan berikutnya ${formatDayShort(research.nextSupervision)}` : ''}`} />
       )}
 
       {!accounts.length && !courses.length && (

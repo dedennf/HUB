@@ -5,7 +5,7 @@ import type { FunctionDeclaration } from '@google/genai';
 import { buildSnapshot, buildSystemPrompt, formatMemory, loadContextData, loadMemory, selectMemory } from './context-builder';
 import { proposeAction } from './actions';
 import { callTool } from './executor';
-import { transcribeAudio } from './voice';
+import { transcribeVoice } from './voice';
 import type { AgentModel, Content } from './model';
 import { functionDeclarations } from './tools';
 import type { ToolCtx } from './tools/types';
@@ -56,10 +56,10 @@ export async function runAgent(opts: {
 }): Promise<AgentResult> {
   const { ctx, model } = opts;
   const db = ctx.db;
-  // pesan suara: Gemini menuliskan ucapannya dulu, lalu diproses seperti teks (D-48)
+  // pesan suara: ucapan dituliskan dulu (model Live bila ada, D-63), lalu diproses seperti teks (D-48)
   let transcript: string | null | undefined;
   if (opts.audio) {
-    transcript = await transcribeAudio(model, opts.audio, opts.signal);
+    transcript = await transcribeVoice(model, opts.audio, opts.signal);
     if (!transcript) {
       const conversationId = await ensureConversation(db, opts.conversationId, 'voice', 'Pesan suara');
       const reply = 'Suaranya kurang jelas. Coba ulang lebih dekat ke mikrofon, atau ketik perintahnya.';

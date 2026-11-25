@@ -117,3 +117,24 @@ export function daysLeftInMonth(today: string): number {
   const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
   return last - d + 1;
 }
+
+export type SafeToSpend = { perDay: number; spentToday: number; leftToday: number; remaining: number; budget: number };
+
+/**
+ * Batas aman belanja hari ini (D-62): sisa budget bulanan semua kategori ber-budget sampai kemarin,
+ * dibagi sisa hari termasuk hari ini, dikurangi belanja ber-budget hari ini. null bila belum ada budget.
+ */
+export function safeToSpend(categories: Category[], monthTxs: TxLite[], today: string, dateOf: (t: TxLite) => string): SafeToSpend | null {
+  const budgeted = new Map(categories.filter((c) => c.monthly_budget != null && c.monthly_budget > 0).map((c) => [c.id, c.monthly_budget!]));
+  if (!budgeted.size) return null;
+  const budget = [...budgeted.values()].reduce((n, b) => n + b, 0);
+  let before = 0;
+  let spentToday = 0;
+  for (const t of monthTxs) {
+    if (t.kind !== 'expense' || !t.category_id || !budgeted.has(t.category_id)) continue;
+    if (dateOf(t) < today) before += t.amount; else if (dateOf(t) === today) spentToday += t.amount;
+  }
+  const days = daysLeftInMonth(today);
+  const perDay = Math.max(0, Math.floor((budget - before) / days));
+  return { perDay, spentToday, leftToday: perDay - spentToday, remaining: budget - before - spentToday, budget };
+}

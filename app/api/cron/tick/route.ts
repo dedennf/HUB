@@ -30,6 +30,8 @@ async function tick(req: Request) {
     session = await ownerSession({ url, anonKey, serviceKey, email: ownerEmail() });
     const report = await runTick(session.db, { model: defaultModel(), push: pushSender() });
     if (report.ran.length || report.delivered.sent) console.log('[cron] tick:', JSON.stringify(report));
+    // jejak untuk halaman Notifikasi: bukti penjadwal benar-benar jalan
+    await session.db.from('settings').upsert({ key: 'cron_last_tick', value: { at: new Date().toISOString(), sent: report.delivered.sent, errors: report.delivered.errors.slice(0, 3) } }, { onConflict: 'user_id,key' });
     return NextResponse.json(report, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
     console.error('[cron] tick gagal:', e);

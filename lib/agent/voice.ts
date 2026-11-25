@@ -1,7 +1,8 @@
 // Pesan suara (SPEC 7.3, D-48): Gemini mendengar rekaman sekali untuk menuliskan ucapan pengguna,
 // lalu transkripnya diproses loop agen seperti pesan teks. Audio tidak dikirim ulang di tiap langkah loop.
 import { z } from 'zod';
-import type { AgentModel } from './model';
+import { transcribeWithLive, wavToPcm16k } from '@/lib/live/transcribe';
+import { geminiConfig, type AgentModel } from './model';
 
 export const TRANSCRIPT_SCHEMA = {
   type: 'object',
@@ -58,4 +59,27 @@ export async function transcribeAudio(model: AgentModel, audio: { data: Buffer; 
   }
   const t = out.transcript.replace(/\s+/g, ' ').trim().slice(0, 1000);
   return out.clear && t ? t : null;
+}
+
+/**
+ * D-63: pesan suara ditranskripsi model Gemini Live (pengenal suara bawaan) bila GEMINI_LIVE_MODEL diisi
+ * dan rekamannya WAV 16 kHz. Bila Live gagal atau tidak tersedia, kembali ke transkripsi model teks.
+ */
+export async function transcribeVoice(model: AgentModel, audio: { data: Buffer; mime: string }, signal?: AbortSignal): Promise<string | null> {
+  const peak = audio.mime === 'audio/wav' ? wavPeakRms(audio.data) : null;
+  if (peak !== null && peak < SERVER_SILENCE_RMS) return null;
+  const live = process.env.GEMINI_LIVE_MODEL?.trim();
+  const cfg = geminiConfig();
+  const pcm = audio.mime === 'audio/wav' ? wavToPcm16k(audio.data) : null;
+  if (live && cfg && pcm) {
+    const t0 = Date.now();
+    try {
+      const t = await transcribeWithLive({ apiKey: cfg.apiKey, model: live, pcm, baseUrl: cfg.baseUrl, timeoutMs: 20_000 });
+      console.log(`[voice] transkripsi Live ${Date.now() - t0} ms`);
+      return t;
+    } catch (e) {
+      console.error('[voice] transkripsi Live gagal, pakai model teks:', (e as Error).message);
+    }
+  }
+  return transcribeAudio(model, audio, signal);
 }
