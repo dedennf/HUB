@@ -8,6 +8,7 @@ import { RaAvatar } from '@/components/ra/RaMark';
 import type { CardView, Lookups } from '@/lib/agent/cards';
 import { confirmActions } from '@/lib/agent/client';
 import { MicStream, PcmPlayer, rateOf } from '@/lib/live/audio';
+import { VoiceOrb, type OrbMode } from './VoiceOrb';
 
 type Status = 'idle' | 'connecting' | 'listening' | 'speaking' | 'ended' | 'error';
 type Turn = { role: 'user' | 'model'; text: string };
@@ -28,7 +29,7 @@ export function LiveCall({ mode = 'assistant', topic, onClose }: { mode?: 'assis
   const [lookups, setLookups] = useState<Lookups | undefined>();
   const [edits, setEdits] = useState<Record<string, Record<string, ChipEdit>>>({});
   const [muted, setMuted] = useState(false);
-  const [level, setLevel] = useState(0);
+  const micLevel = useRef(0);
   const session = useRef<Session | null>(null);
   const mic = useRef<MicStream | null>(null);
   const player = useRef<PcmPlayer | null>(null);
@@ -118,7 +119,7 @@ export function LiveCall({ mode = 'assistant', topic, onClose }: { mode?: 'assis
           onclose: (e) => { if (session.current) { setStatus(e.code === 1000 ? 'ended' : 'error'); void finish(e.code === 1000 ? undefined : `Sambungan ditutup Gemini${e.reason ? `: ${e.reason}` : ''}.`); } },
         },
       });
-      const m = new MicStream((b64) => session.current?.sendRealtimeInput({ audio: { data: b64, mimeType: 'audio/pcm;rate=16000' } }), setLevel);
+      const m = new MicStream((b64) => session.current?.sendRealtimeInput({ audio: { data: b64, mimeType: 'audio/pcm;rate=16000' } }), (v) => { micLevel.current = v; });
       mic.current = m;
       await m.start();
       started.current = Date.now();
@@ -142,19 +143,21 @@ export function LiveCall({ mode = 'assistant', topic, onClose }: { mode?: 'assis
   };
 
   const live = status === 'listening' || status === 'speaking';
+  const orbMode: OrbMode = status === 'connecting' ? 'connecting' : !live ? 'idle' : muted && status === 'listening' ? 'muted' : status;
+  // saat Ra bicara ikuti suaranya, selain itu ikuti mikrofon
+  const orbLevel = () => (status === 'speaking' ? player.current?.level() ?? 0 : micLevel.current);
   return (
     <section aria-label={mode === 'english' ? 'Percakapan bahasa Inggris dengan Ra' : 'Percakapan langsung dengan Ra'} className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex items-center gap-3">
-        <span className={`rounded-full ${status === 'speaking' ? 'ring-4 ring-accent/30' : ''}`}><RaAvatar size={40} /></span>
+        <RaAvatar size={40} />
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-semibold" role="status">{LABEL[status]}</p>
           <p className="text-[12px] text-muted">{mode === 'english' ? 'English conversation · bicara bebas' : 'Bicara biasa, Ra bisa dipotong kapan saja'}</p>
         </div>
-        {live && (
-          <span className="flex h-6 items-end gap-0.5" aria-hidden="true">
-            {[0.6, 1, 0.8, 0.5].map((k, i) => <span key={i} className="w-1 rounded-full bg-accent transition-all" style={{ height: `${Math.max(4, level * 24 * k)}px` }} />)}
-          </span>
-        )}
+      </div>
+
+      <div className="flex justify-center py-1">
+        <VoiceOrb mode={orbMode} level={orbLevel} size={turns.length || cards.length ? 132 : 176} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto" aria-live="polite">

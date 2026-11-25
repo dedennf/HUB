@@ -112,12 +112,30 @@ export class PcmPlayer {
   private ctx: AudioContext | null = null;
   private next = 0;
   private sources = new Set<AudioBufferSourceNode>();
+  private analyser: AnalyserNode | null = null;
+  private probe: Float32Array<ArrayBuffer> | null = null;
   onPlayingChange?: (playing: boolean) => void;
 
   /** Panggil dari gestur pengguna (klik) supaya Safari mengizinkan suara. */
   unlock() {
-    if (!this.ctx) this.ctx = new (AC())();
+    if (!this.ctx) {
+      this.ctx = new (AC())();
+      // semua suara Ra lewat analyser supaya animasi bisa membaca volumenya
+      this.analyser = this.ctx.createAnalyser();
+      this.analyser.fftSize = 512;
+      this.analyser.connect(this.ctx.destination);
+      this.probe = new Float32Array(this.analyser.fftSize);
+    }
     void this.ctx.resume();
+  }
+
+  /** Volume suara Ra yang sedang diputar, 0..1. */
+  level(): number {
+    if (!this.analyser || !this.probe || !this.sources.size) return 0;
+    this.analyser.getFloatTimeDomainData(this.probe);
+    let sum = 0;
+    for (let i = 0; i < this.probe.length; i++) sum += this.probe[i] * this.probe[i];
+    return Math.min(1, Math.sqrt(sum / this.probe.length) * 5);
   }
 
   play(b64: string, rate = OUT_RATE) {
@@ -130,7 +148,7 @@ export class PcmPlayer {
     for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 0x8000;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    src.connect(ctx.destination);
+    src.connect(this.analyser ?? ctx.destination);
     const at = Math.max(ctx.currentTime + 0.02, this.next);
     src.start(at);
     this.next = at + buf.duration;
@@ -153,6 +171,8 @@ export class PcmPlayer {
     this.interrupt();
     void this.ctx?.close().catch(() => {});
     this.ctx = null;
+    this.analyser = null;
+    this.probe = null;
   }
 }
 

@@ -585,3 +585,10 @@ Login tanpa verifikasi sama sekali tidak dipilih. App ini menyimpan data keuanga
 Database Supabase ada di Southeast Asia (Singapore), sedangkan fungsi Vercel tanpa pengaturan berjalan di `iad1` (Washington DC). Setiap halaman memuat beberapa query, dan tiap query bolak-balik Amerika ke Singapura, sehingga app terasa lambat. `vercel.json` kini memakai `"regions": ["sin1"]` agar server berjalan di Singapura, dekat dengan database dan dengan pengguna di Indonesia. Paket Hobby mengizinkan satu region.
 
 Membungkus app menjadi aplikasi desktop (Electron atau Tauri) tidak dipilih sebagai perbaikan kecepatan, karena data tetap diambil lewat server yang sama.
+
+## D-59 · Bola suara di mode Live
+**Status: Diputuskan**
+
+Empat batang kecil di samping status diganti bola suara di tengah layar (`components/live/VoiceOrb.tsx`). Tiga lapis gumpalan bergelombang mengikuti volume: mikrofon saat pengguna bicara, dan suara Ra saat Ra bicara. Volume Ra dibaca dari `AnalyserNode` yang dipasang di antara pemutar dan speaker (`PcmPlayer.level()`). Bola abu-abu saat belum tersambung atau mic dibisukan, dan berdenyut pelan saat menyambung.
+
+Digambar di canvas dengan `requestAnimationFrame`. Level dibaca lewat ref, bukan state, supaya React tidak merender ulang tiap frame. Warna diambil dari token tema, jadi ikut mode terang dan gelap. Dengan `prefers-reduced-motion`, bola tidak bergelombang dan hanya membesar mengikuti volume.
