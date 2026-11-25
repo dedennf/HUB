@@ -45,7 +45,7 @@ App pribadi satu pengguna untuk mengelola kehidupan kuliah, riset, keuangan, dan
 | Frontend + API | Next.js App Router, TypeScript, Tailwind | ikuti yang sudah ada |
 | Hosting | Vercel | sudah berjalan |
 | Database | Supabase (Postgres) | sumber data tunggal untuk laptop dan HP |
-| Auth | Supabase Auth, satu pengguna | login email/magic link |
+| Auth | Supabase Auth, satu pengguna | login email dengan kode OTP 6 angka (tautan sebagai cadangan, lihat D-57) |
 | Storage | Supabase Storage, bucket `receipts` (private) | gambar struk |
 | AI | Gemini via SDK `@google/genai` | nama model lewat env, jangan di-hardcode |
 | Penjadwal | Supabase `pg_cron` + `pg_net` memanggil `/api/cron/tick` tiap 5 menit | cron Vercel paket gratis frekuensinya terbatas |

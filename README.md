@@ -12,7 +12,7 @@ Stack: Next.js 16 (App Router, TypeScript, Tailwind 4), Supabase (Postgres, Auth
 4. **Authentication, URL Configuration**:
    - Site URL: alamat production Vercel, misalnya `https://nama-app.vercel.app`
    - Redirect URLs: `https://nama-app.vercel.app/auth/confirm`, `http://localhost:3000/auth/confirm`, dan pola preview Vercel jika perlu
-5. **Authentication, Emails, Magic Link**: ganti isi template dengan `supabase/templates/magic_link.html`. Template ini memakai `token_hash` sehingga tautan bisa dibuka di perangkat lain.
+5. **Authentication, Emails, Magic Link**: ganti isi template dengan `supabase/templates/magic_link.html`. Template ini menampilkan kode masuk 6 angka (`{{ .Token }}`) untuk diketik di app, ditambah tautan `token_hash` sebagai cadangan saat dibuka di browser.
 6. Jalankan migrasi (lihat di bawah).
 
 ## Variabel lingkungan
@@ -82,7 +82,7 @@ npx supabase link --project-ref <ref-proyek>
 npx supabase db push
 ```
 
-Supabase lokal (butuh Docker): `npx supabase start`, lalu isi `.env.local` dengan URL dan anon key yang ditampilkan. Email tautan masuk bisa dilihat di Mailpit (`http://localhost:54324`).
+Supabase lokal (butuh Docker): `npx supabase start`, lalu isi `.env.local` dengan URL dan anon key yang ditampilkan. Email berisi kode masuk bisa dilihat di Mailpit (`http://localhost:54324`).
 
 ## Memindahkan data app lama 
  

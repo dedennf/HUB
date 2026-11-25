@@ -564,3 +564,16 @@ Sesi latihan dicatat ke `practice_sessions` (review saat dek selesai, baca saat 
 - **Riwayat**: transkrip dua arah disimpan ke `agent_messages` saat percakapan diakhiri (`/api/live/end`, kanal `voice`, judul "Percakapan langsung"). Audio tidak disimpan.
 - **Mode bahasa Inggris**: di `/bahasa/bicara`, instruksi sistem berupa partner percakapan sesuai level, tujuan, tingkat koreksi, dan pola kesalahan teratas. Koreksi disampaikan dengan mengulang bentuk yang benar secara natural, tanpa ceramah. Mode ini tanpa tools. Durasi tercatat sebagai `practice_sessions` kind `speaking`.
 - **Verifikasi production**: `/api/agent/diagnose` membuat token dengan konfigurasi asisten yang sama persis (termasuk 38 tool), tersambung, dan menunggu jawaban pertama. Dengan begitu nama model Live dan penerimaan deklarasi tool bisa dipastikan di server asli. Uji lokal memakai server Live tiruan (WebSocket) dengan protokol yang sama.
+
+## D-57 · Login memakai kode OTP, tautan jadi cadangan
+**Status: Diputuskan**
+
+Saat Kompas dipasang sebagai app (PWA) di laptop atau HP, tautan di email terbuka di browser biasa, bukan di jendela app. Sesi tersimpan di browser itu, sehingga app terpasang tetap di halaman masuk.
+
+Halaman masuk kini dua langkah: isi email, lalu ketik kode 6 angka dari email (`verifyOtp` tipe `email` lewat server action). Sesi langsung tersimpan di cookie jendela yang sedang dipakai, jadi tidak bergantung pada ke mana tautan dibuka. Satu email `signInWithOtp` memuat kode dan tautan sekaligus, sehingga tautan `token_hash` tetap jalan sebagai cadangan di browser.
+
+Pengecekan pemilik dan `bootstrap_user` dipindah ke `lib/auth-finish.ts` agar tautan dan kode melewati jalur yang sama. Email selain pemilik tetap tidak dikirimi apa pun dan melihat tampilan yang sama. Batas percobaan mengikuti pembatas bawaan Supabase Auth.
+
+Login tanpa verifikasi sama sekali tidak dipilih. App ini menyimpan data keuangan dan bisa dibuka siapa pun yang tahu alamatnya, jadi satu-satunya penjaga adalah bukti bahwa yang masuk memegang email pemilik. Sesi Supabase diperbarui otomatis, jadi kode hanya diminta saat sesi benar-benar habis atau setelah keluar.
+
+Template email di Supabase production harus diperbarui manual (Authentication, Emails, Magic Link) karena `config.toml` hanya berlaku untuk Supabase lokal.
