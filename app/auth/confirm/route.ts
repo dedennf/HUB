@@ -1,7 +1,7 @@
 import type { EmailOtpType, User } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
-import { finishLogin } from '@/lib/auth-finish';
-import { logAuthFailure } from '@/lib/auth-log';
+import { logAuthFailure, maskEmail } from '@/lib/auth-log';
+import { isOwnerEmail } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 
 const OTP_TYPES: EmailOtpType[] = ['email', 'magiclink', 'signup', 'invite', 'recovery', 'email_change'];
@@ -51,8 +51,27 @@ export async function GET(request: NextRequest) {
     return to('/login?error=link');
   }
 
-  const result = await finishLogin(supabase, user, 'confirm');
-  if (result !== 'ok') return to(`/login?error=${result}`);
+  let owner: boolean;
+  try {
+    owner = isOwnerEmail(user.email);
+  } catch (e) {
+    logAuthFailure('confirm', 'OWNER_EMAIL tidak bisa dibaca', { message: (e as Error).message });
+    await supabase.auth.signOut();
+    return to('/login?error=config');
+  }
+  if (!owner) {
+    logAuthFailure('confirm', 'email bukan pemilik', {
+      email: maskEmail(user.email),
+      owner: maskEmail(process.env.OWNER_EMAIL?.trim()),
+      ownerLength: process.env.OWNER_EMAIL?.length ?? 0,
+    });
+    await supabase.auth.signOut();
+    return to('/login?error=not_owner');
+  }
+
+  // Kategori bawaan dan pengaturan default (idempoten). Gagal di sini tidak menghalangi login.
+  const { error: bootError } = await supabase.rpc('bootstrap_user');
+  if (bootError) logAuthFailure('confirm', 'bootstrap_user gagal', { code: bootError.code, message: bootError.message });
 
   return to('/');
 }
