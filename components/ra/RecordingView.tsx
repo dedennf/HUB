@@ -1,7 +1,7 @@
 import { Mic } from 'lucide-react';
 
 /** Tampilan merekam suara: gelombang, timer besar, tombol mic 76 px (DESIGN 6, Kondisi.dc.html). */
-export function RecordingView({ seconds, levels }: { seconds: number; levels: number[] }) {
+export function RecordingView({ seconds, levels, hint = 'Lepas atau tekan Kirim untuk mengirim · geser ke kiri untuk batal · maks 60 detik' }: { seconds: number; levels: number[]; hint?: string }) {
   return (
     <div className="flex flex-col items-center gap-6 py-6 text-center">
       <p className="text-[14px] text-muted">Ra mendengarkan...</p>
@@ -14,7 +14,7 @@ export function RecordingView({ seconds, levels }: { seconds: number; levels: nu
           <Mic size={30} strokeWidth={1.8} aria-hidden="true" />
         </span>
       </span>
-      <p className="text-[12px] text-muted">Lepas atau tekan Kirim untuk mengirim · geser ke kiri untuk batal · maks 60 detik</p>
+      <p className="text-[12px] text-muted">{hint}</p>
     </div>
   );
 }

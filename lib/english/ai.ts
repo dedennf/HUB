@@ -10,20 +10,20 @@ const GOAL: Record<string, string> = {
   academic_general: 'bahasa Inggris akademik untuk jurnal dan menulis, plus percakapan umum', toefl: 'persiapan TOEFL', ielts: 'persiapan IELTS',
   conversation: 'percakapan sehari-hari', career: 'karier dan wawancara kerja',
 };
-const describe = (p: EnglishProfile) => `Pengguna: mahasiswa Indonesia, level ${LEVEL[p.level] ?? p.level}, tujuan ${GOAL[p.goal] ?? p.goal}.`;
+export const describe = (p: EnglishProfile) => `Pengguna: mahasiswa Indonesia, level ${LEVEL[p.level] ?? p.level}, tujuan ${GOAL[p.goal] ?? p.goal}.`;
 
 function parseJson<T>(schema: z.ZodType<T>, raw: string): T {
   return schema.parse(JSON.parse(raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, '')));
 }
 
-async function ask<T>(model: AgentModel, system: string, user: string, json: unknown, schema: z.ZodType<T>, signal?: AbortSignal, audio?: { data: Buffer; mime: string }): Promise<T> {
+export async function ask<T>(model: AgentModel, system: string, user: string, json: unknown, schema: z.ZodType<T>, signal?: AbortSignal, audio?: { data: Buffer; mime: string }): Promise<T> {
   const parts = audio ? [{ inlineData: { mimeType: audio.mime, data: audio.data.toString('base64') } }, { text: user }] : [{ text: user }];
   const turn = await model.generate({ system, contents: [{ role: 'user', parts }], tools: [], json, thinking: 'low', signal });
   return parseJson(schema, turn.text);
 }
 
-const str = (d?: string) => ({ type: 'string', ...(d ? { description: d } : {}) });
-const num = { type: 'number' };
+export const str = (d?: string) => ({ type: 'string', ...(d ? { description: d } : {}) });
+export const num = { type: 'number' };
 
 /* ---------------- jelaskan dan pecah kalimat (membaca berpendamping) ---------------- */
 

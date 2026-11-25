@@ -684,9 +684,16 @@ Agen membaca pengaturan ini untuk menyesuaikan kesulitan materi dan gaya latihan
    - Setiap interaksi English Mode disimpan sebagai `writing_submissions` dengan `kind = 'english_mode'` agar pola kesalahan ikut terlacak.
 
 ### 10.3 Halaman Bahasa
-- Ringkasan: streak, kata jatuh tempo hari ini, total kata dikuasai (interval ≥ 21 hari), 3 pola kesalahan teratas.
-- Tombol cepat: Review, Baca, Tulis, Bicara.
-- Riwayat sesi latihan.
+Diperbarui oleh D-60 (persiapan IELTS):
+- Perkiraan band IELTS per skill dibanding target (`english_target_band`, bawaan 6,5) dan hitung mundur tanggal tes bila diisi.
+- Sesi harian sekitar 15 menit (`/bahasa/sesi`):
+  1. review kartu
+  2. 5 kata akademik baru
+  3. satu topik grammar dari kurikulum B1 sampai C1
+  4. satu skill tes yang bergilir per hari
+- Latihan per skill: Reading, Writing Task 1 dan 2, Speaking Part 1 sampai 3. Listening menyusul.
+- Pola kesalahan teratas, laporan minggu ini, dan riwayat sesi latihan.
+- Alat lama (Baca jurnal, Tulis bebas, Bank kata, Ngobrol bebas) tetap tersedia.
 
 ### 10.4 Latihan Adaptif
 `start_practice` memilih materi berdasarkan `mistake_patterns` teratas dan level. Contoh: kalau pola teratas "article a/an/the", latihan menulis berikutnya diberi instruksi yang memancing penggunaan artikel, dan review menyelipkan kata-kata terkait.

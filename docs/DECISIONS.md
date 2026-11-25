@@ -592,3 +592,42 @@ Membungkus app menjadi aplikasi desktop (Electron atau Tauri) tidak dipilih seba
 Empat batang kecil di samping status diganti bola suara di tengah layar (`components/live/VoiceOrb.tsx`). Tiga lapis gumpalan bergelombang mengikuti volume: mikrofon saat pengguna bicara, dan suara Ra saat Ra bicara. Volume Ra dibaca dari `AnalyserNode` yang dipasang di antara pemutar dan speaker (`PcmPlayer.level()`). Bola abu-abu saat belum tersambung atau mic dibisukan, dan berdenyut pelan saat menyambung.
 
 Digambar di canvas dengan `requestAnimationFrame`. Level dibaca lewat ref, bukan state, supaya React tidak merender ulang tiap frame. Warna diambil dari token tema, jadi ikut mode terang dan gelap. Dengan `prefers-reduced-motion`, bola tidak bergelombang dan hanya membesar mengikuti volume.
+
+## D-60 · Modul Bahasa v2: persiapan IELTS
+**Status: Diputuskan**
+
+Pemilik menargetkan IELTS Academic band 6,5, belum ada tanggal tes. Modul Bahasa dirombak dari kumpulan alat lepas menjadi persiapan tes dengan sesi harian sekitar 15 menit. Konsep dan mockup ada di kanvas desain (papan "Bahasa Inggris v2").
+
+**Dasar.** Pembagiannya mengikuti empat jalur Nation (2007): input bermakna, output bermakna, fokus bahasa, dan kelancaran, dengan fokus bahasa tidak mendominasi. Review kartu memakai SM-2 yang sudah ada (pengulangan berjarak). Penilaian Writing dan Speaking memakai empat kriteria public band descriptors IELTS.
+
+**Sesi harian** (`/bahasa/sesi`, tabel `english_days`):
+1. **Review kartu.** Maksimal 15 kartu. Dianggap selesai otomatis bila tidak ada kartu jatuh tempo.
+2. **5 kata akademik baru.** Pengguna menulis satu kalimat yang diperiksa Gemini. Kata masuk ke bank kata dengan `source_type = 'daily'` dan review pertama dijadwalkan besok.
+3. **Satu topik grammar.** Diambil dari kurikulum 29 topik B1 sampai C1 (`lib/english/ielts.ts`). Topik yang terkait 3 kesalahan teratas didahulukan. Topik dianggap dikuasai bila skor terbaik minimal 4 dari 5 (`grammar_progress`).
+4. **Satu skill tes bergilir per hari.** Langkah ini tercentang otomatis saat hasil latihan yang cocok disimpan.
+
+   | Hari | Skill |
+   |---|---|
+   | Senin | Reading |
+   | Selasa | Writing Task 2 |
+   | Rabu | Speaking Part 1 |
+   | Kamis | Speaking Part 2 |
+   | Jumat | Writing Task 1 |
+   | Sabtu | Speaking Part 3 |
+   | Minggu | Laporan |
+
+Konten dari Gemini (kata, materi grammar) disimpan di baris hari itu. Membuka ulang sesi tidak memanggil Gemini lagi.
+
+**Latihan per skill:**
+- **Reading:** teks 320 sampai 400 kata dengan 3 soal TRUE/FALSE/NOT GIVEN dan 3 soal pilihan ganda. Band dihitung dari persentase memakai tabel konversi umum 40 soal, dan diberi label kasar.
+- **Writing:** Task 1 berbasis tabel data, Task 2 esai. Dinilai per kriteria (Task Achievement/Response, Coherence and Cohesion, Lexical Resource, Grammatical Range and Accuracy) dan bisa direvisi lalu dinilai ulang. Hasilnya tersimpan sebagai `writing_submissions` jenis `ielts_task1` atau `ielts_task2`.
+- **Speaking:** Part 1, 2 (cue card, persiapan 1 menit, rekaman sampai 2 menit), dan 3. Dinilai lewat `/api/english/ielts-speaking`. Rekaman tidak disimpan.
+- **Listening:** belum ada. Rencananya memakai model TTS Gemini.
+
+**Perkiraan band.** Dihitung dari rata-rata 3 latihan terakhir per skill dalam 60 hari. Writing memberi Task 2 bobot dua kali Task 1. Semua skor ditulis sebagai perkiraan, bukan skor resmi.
+
+**Kata harian dipilih Gemini.** Gemini diminta mengutamakan headword Academic Word List (Coxhead, 2000), tetapi daftar AWL tidak ikut disimpan di repo. Akibatnya, kata yang dipilih tidak dijamin selalu berasal dari AWL.
+
+**Pengaturan baru.** `english_target_band` (bawaan 6,5) dan `english_test_date` (opsional). Tanggal tes yang dikosongkan menghapus baris pengaturannya, karena kolom `value` wajib diisi.
+
+Alat lama (Baca jurnal, Tulis bebas, Bank kata, Ngobrol bebas, English Mode) tetap ada di bagian "Alat lain".

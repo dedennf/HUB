@@ -13,7 +13,7 @@ const GRADES = [
 ] as const;
 
 /** Flashcard SM-2 (SPEC 10.2.1, DESIGN Flashcard): ketuk untuk melihat arti, lalu nilai Lupa, Sulit, Bisa, atau Mudah. */
-export function ReviewDeck({ cards: initial }: { cards: ReviewCard[] }) {
+export function ReviewDeck({ cards: initial, onDone }: { cards: ReviewCard[]; onDone?: () => void }) {
   const router = useRouter();
   // kartu sesi dibekukan: penyegaran halaman setelah kartu terakhir tidak boleh mengganti pesan "Selesai"
   const [cards] = useState(initial);
@@ -44,6 +44,7 @@ export function ReviewDeck({ cards: initial }: { cards: ReviewCard[] }) {
     setShown(false);
     if (i + 1 >= cards.length) {
       await finishReview(count, (Date.now() - (startedAt.current ?? Date.now())) / 1000);
+      onDone?.();
       router.refresh();
     }
     setI(i + 1);

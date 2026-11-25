@@ -4,9 +4,11 @@ import type { UndoOp } from '@/lib/agent/tools/types';
 import type { EnglishProfile } from './ai';
 import { review } from './srs';
 
-export async function loadProfile(db: SupabaseClient): Promise<EnglishProfile & { dailyMinutes: number; mode: boolean }> {
+export type FullProfile = EnglishProfile & { dailyMinutes: number; mode: boolean; targetBand: number; testDate: string | null };
+
+export async function loadProfile(db: SupabaseClient): Promise<FullProfile> {
   const [{ data: s }, { data: m }] = await Promise.all([
-    db.from('settings').select('key,value').in('key', ['english_level', 'english_goal', 'english_correction_level', 'english_daily_minutes', 'english_mode']),
+    db.from('settings').select('key,value').in('key', ['english_level', 'english_goal', 'english_correction_level', 'english_daily_minutes', 'english_mode', 'english_target_band', 'english_test_date']),
     db.from('mistake_patterns').select('pattern').order('count', { ascending: false }).limit(3),
   ]);
   const v = Object.fromEntries((s ?? []).map((r) => [r.key, r.value]));
@@ -16,6 +18,8 @@ export async function loadProfile(db: SupabaseClient): Promise<EnglishProfile & 
     correction: typeof v.english_correction_level === 'string' ? v.english_correction_level : 'important_only',
     dailyMinutes: Number(v.english_daily_minutes) || 15,
     mode: v.english_mode === true,
+    targetBand: Number(v.english_target_band) || 6.5,
+    testDate: typeof v.english_test_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.english_test_date) ? v.english_test_date : null,
     topMistakes: (m ?? []).map((r) => r.pattern),
   };
 }
@@ -42,12 +46,12 @@ export async function recordMistakes(db: SupabaseClient, mistakes: Mistake[], no
 
 /** Simpan tulisan dan koreksinya, lalu perbarui pola kesalahan. */
 export async function saveSubmission(db: SupabaseClient, s: {
-  kind: 'free' | 'summary' | 'abstract' | 'journal' | 'english_mode'; original: string; corrected: string; prompt?: string | null;
-  mistakes: Mistake[]; score?: Record<string, number> | null; summary?: string;
+  kind: 'free' | 'summary' | 'abstract' | 'journal' | 'english_mode' | 'ielts_task1' | 'ielts_task2'; original: string; corrected: string; prompt?: string | null;
+  mistakes: Mistake[]; score?: Record<string, number> | null; summary?: string; extra?: Record<string, unknown>;
 }, now: Date): Promise<{ id: string; undo: UndoOp[] }> {
   const { data, error } = await db.from('writing_submissions').insert({
     kind: s.kind, original: s.original, corrected: s.corrected, prompt: s.prompt ?? null,
-    feedback: { mistakes: s.mistakes, score: s.score ?? null, summary: s.summary ?? null },
+    feedback: { mistakes: s.mistakes, score: s.score ?? null, summary: s.summary ?? null, ...(s.extra ?? {}) },
   }).select('id').single();
   if (error || !data) throw new Error(`Gagal menyimpan tulisan: ${error?.message}`);
   const undo: UndoOp[] = [{ op: 'delete', table: 'writing_submissions', id: data.id }, ...(await recordMistakes(db, s.mistakes, now))];
@@ -65,7 +69,7 @@ export async function gradeVocab(db: SupabaseClient, id: string, grade: number, 
   return next;
 }
 
-export async function logSession(db: SupabaseClient, s: { kind: 'review' | 'reading' | 'writing' | 'speaking'; seconds?: number; summary?: string; score?: Record<string, unknown> | null }) {
+export async function logSession(db: SupabaseClient, s: { kind: 'review' | 'reading' | 'writing' | 'speaking' | 'grammar' | 'listening'; seconds?: number; summary?: string; score?: Record<string, unknown> | null }) {
   await db.from('practice_sessions').insert({ kind: s.kind, duration_seconds: s.seconds ? Math.round(s.seconds) : null, summary: s.summary?.slice(0, 500) ?? null, score: s.score ?? null });
 }
 
