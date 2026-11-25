@@ -1,35 +1,15 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { defaultModel, ModelError, type AgentModel } from '@/lib/agent/model';
 import { requireUser } from '@/lib/auth';
 import {
   correctWriting, explainText, speakingQuestion, vocabEntry, type Correction, type Explanation, type VocabEntry,
 } from '@/lib/english/ai';
+import { withModel, type Result } from '@/lib/english/run';
 import { gradeVocab, loadProfile, logSession, saveSubmission } from '@/lib/english/store';
 import { createClient } from '@/lib/supabase/server';
 
-export type Result<T> = { ok: true; data: T } | { ok: false; message: string };
-
-const OFFLINE: Record<ModelError['reason'], string> = {
-  not_configured: 'Gemini belum diatur', quota: 'kuota Gemini habis', timeout: 'Gemini terlalu lama menjawab', rejected: 'permintaan ditolak Gemini', unavailable: 'Gemini tidak bisa dihubungi',
-};
-
-/** Jalankan fungsi Gemini dengan pesan galat yang ramah (SPEC 12). */
-async function withModel<T>(fn: (m: AgentModel) => Promise<T>): Promise<Result<T>> {
-  const model = defaultModel();
-  if (!model) return { ok: false, message: 'Ra belum tersambung ke Gemini, fitur ini belum bisa dipakai.' };
-  try {
-    return { ok: true, data: await fn(model) };
-  } catch (e) {
-    if (e instanceof ModelError) {
-      console.error('[english] Gemini gagal:', e.reason, e.detail);
-      return { ok: false, message: `Ra tidak bisa menjawab sekarang (${OFFLINE[e.reason]}). Coba lagi sebentar.` };
-    }
-    console.error('[english] galat:', e);
-    return { ok: false, message: 'Jawaban Ra tidak terbaca. Coba lagi.' };
-  }
-}
+export type { Result } from '@/lib/english/run';
 
 const uuid = z.uuid();
 
@@ -142,6 +122,8 @@ const settingsForm = z.object({
   english_goal: z.enum(['academic_general', 'toefl', 'ielts', 'conversation', 'career']),
   english_daily_minutes: z.coerce.number().int().min(5).max(180),
   english_correction_level: z.enum(['all', 'important_only', 'off']),
+  english_target_band: z.coerce.number().min(4).max(9).refine((n) => Number.isInteger(n * 2), 'Kelipatan 0,5.'),
+  english_test_date: z.union([z.literal(''), z.iso.date()]).transform((v) => v || null),
 });
 
 export async function saveEnglishSettings(_prev: { ok: boolean; message?: string }, form: FormData): Promise<{ ok: boolean; message?: string }> {
@@ -150,7 +132,10 @@ export async function saveEnglishSettings(_prev: { ok: boolean; message?: string
   if (!p.success) return { ok: false, message: 'Pilihan tidak valid.' };
   const db = await createClient();
   for (const [key, value] of Object.entries(p.data)) {
-    const { error } = await db.from('settings').upsert({ key, value }, { onConflict: 'user_id,key' });
+    // tanggal tes kosong berarti belum ditentukan: hapus barisnya (kolom value wajib diisi)
+    const { error } = value == null
+      ? await db.from('settings').delete().eq('key', key)
+      : await db.from('settings').upsert({ key, value }, { onConflict: 'user_id,key' });
     if (error) return { ok: false, message: 'Gagal menyimpan.' };
   }
   revalidatePath('/bahasa');

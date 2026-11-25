@@ -59,7 +59,7 @@ export async function toGeminiAudio(blob: Blob): Promise<{ blob: Blob; mime: str
 
 export type RecorderUpdate = { seconds: number; levels: number[] };
 
-/** Satu sesi rekaman. `stop()` mengembalikan audio, `cancel()` membuang. Berhenti sendiri di 60 detik. */
+/** Satu sesi rekaman. `stop()` mengembalikan audio, `cancel()` membuang. Berhenti sendiri di `maxSeconds` (bawaan 60 detik). */
 export class VoiceRecorder {
   private rec: MediaRecorder | null = null;
   private stream: MediaStream | null = null;
@@ -73,7 +73,7 @@ export class VoiceRecorder {
   private peak = -1;
   private cancelled = false;
 
-  constructor(private onUpdate: (u: RecorderUpdate) => void, private onLimit: () => void) {}
+  constructor(private onUpdate: (u: RecorderUpdate) => void, private onLimit: () => void, private maxSeconds = MAX_SECONDS) {}
 
   async start(): Promise<void> {
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
@@ -92,7 +92,7 @@ export class VoiceRecorder {
     this.meter();
     this.timer = setInterval(() => {
       const s = (Date.now() - this.started) / 1000;
-      if (s >= MAX_SECONDS) this.onLimit();
+      if (s >= this.maxSeconds) this.onLimit();
     }, 250);
   }
 

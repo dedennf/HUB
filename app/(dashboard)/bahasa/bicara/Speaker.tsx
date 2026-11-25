@@ -85,7 +85,7 @@ export function Speaker() {
       )}
       {rec && (
         <div className="card">
-          <RecordingView seconds={rec.seconds} levels={rec.levels.length ? rec.levels : Array(16).fill(0.1)} />
+          <RecordingView seconds={rec.seconds} levels={rec.levels.length ? rec.levels : Array(16).fill(0.1)} hint="Tekan Selesai bila sudah · maks 60 detik" />
           <div className="px-4 pb-4">
             <button type="button" onClick={() => void finish()} className="btn btn-primary inline-flex w-full items-center justify-center gap-2"><Square size={16} aria-hidden="true" />Selesai, nilai jawaban</button>
           </div>
