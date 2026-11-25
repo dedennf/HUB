@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Masuk' };
 
 const ERRORS: Record<string, string> = {
   not_owner: 'Akun ini tidak punya akses ke Kompas. Masuk dengan email pemilik (sama dengan OWNER_EMAIL di server).',
-  link: 'Tautan masuk tidak valid atau sudah kedaluwarsa. Minta tautan baru.',
+  link: 'Tautan masuk tidak valid atau sudah kedaluwarsa. Minta kode baru di bawah.',
   config: 'Server belum dikonfigurasi. Isi variabel Supabase di Vercel lalu deploy ulang.',
 };
 
@@ -24,7 +24,7 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
       </div>
       {message && <p role="alert" className="rounded-xl bg-danger-bg p-3 text-[13px] text-danger-fg">{message}</p>}
       <div className="card p-4"><LoginForm /></div>
-      <p className="text-[12px] text-muted">Masuk tanpa kata sandi. Tautan dikirim ke email pemilik dan berlaku sekali pakai.</p>
+      <p className="text-[12px] text-muted">Masuk tanpa kata sandi. Kode 6 angka dikirim ke email pemilik dan berlaku sekali pakai. Cocok untuk app yang terpasang di laptop atau HP karena tidak perlu membuka tautan.</p>
     </main>
   );
 }

@@ -1,4 +1,6 @@
 <h2>Masuk ke Kompas</h2>
-<p>Ketuk tautan ini untuk masuk. Tautan berlaku sekali pakai dan bisa dibuka di perangkat mana pun.</p>
-<p><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">Masuk ke Kompas</a></p>
-<p>Kalau kamu tidak meminta tautan ini, abaikan email ini.</p>
+<p>Kode masuk kamu:</p>
+<p style="font-size:28px;font-weight:700;letter-spacing:6px">{{ .Token }}</p>
+<p>Ketik kode ini di halaman masuk Kompas (berlaku sekali pakai, satu jam). Cara ini juga jalan di app yang terpasang di laptop atau HP.</p>
+<p>Kalau sedang di browser, kamu juga bisa <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">ketuk tautan ini</a>.</p>
+<p>Kalau kamu tidak meminta kode ini, abaikan email ini.</p>
