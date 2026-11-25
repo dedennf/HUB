@@ -79,3 +79,28 @@ export async function verifyLoginCode(_prev: LoginState, formData: FormData): Pr
   if (result !== 'ok') redirect(`/login?error=${result}`);
   redirect('/');
 }
+
+/** Masuk dengan email dan kata sandi. Tidak butuh email sama sekali, cocok untuk app terpasang. */
+export async function signInWithPassword(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  const email = String(formData.get('email') ?? '').trim();
+  const password = String(formData.get('password') ?? '');
+  const fail = (message: string): LoginState => ({ status: 'error', step: 'email', email, message });
+
+  if (!emailSchema.safeParse(email).success) return fail('Format email tidak valid.');
+  if (!password) return fail('Isi kata sandi.');
+  // Pesan sama untuk email lain dan sandi salah supaya tidak bisa dipakai menebak.
+  const wrong = 'Email atau kata sandi salah. Belum pernah membuat kata sandi? Masuk lewat kode atau tautan email dulu.';
+  if (!isOwnerEmail(email)) return fail(wrong);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error || !data.user) {
+    if (error) logAuthFailure('login-password', 'signInWithPassword gagal', { status: error.status, code: error.code, message: error.message });
+    if (error?.status === 429) return fail('Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.');
+    return fail(wrong);
+  }
+
+  const result = await finishLogin(supabase, data.user, 'login-password');
+  if (result !== 'ok') redirect(`/login?error=${result}`);
+  redirect('/');
+}

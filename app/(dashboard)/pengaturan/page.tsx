@@ -1,4 +1,4 @@
-import { Bell, Brain, DatabaseBackup, Palette, Tags, UserRound } from 'lucide-react';
+import { Bell, Brain, DatabaseBackup, KeyRound, Palette, Tags, UserRound } from 'lucide-react';
 import type { Metadata } from 'next';
 import { Balance } from '@/components/ui/Balance';
 import { MenuRow } from '@/components/ui/MenuRow';
@@ -18,6 +18,7 @@ export default async function PengaturanPage() {
       <PageHeader title="Pengaturan" back={{ href: '/saya', label: 'Saya' }} />
       <div className="card rows overflow-hidden">
         <MenuRow href="/pengaturan/profil" icon={UserRound} title="Profil" detail="Nama dan program studi untuk sapaan" />
+        <MenuRow href="/pengaturan/kata-sandi" icon={KeyRound} title="Kata sandi" detail="Masuk di app terpasang tanpa email" />
         <MenuRow href="/pengaturan/tampilan" icon={Palette} title="Tampilan" detail="Tema terang, gelap, atau otomatis · privasi saldo" />
         <MenuRow href="/pengaturan/kategori" icon={Tags} title="Kategori dan budget" detail="Kategori pengeluaran dan pemasukan" />
         <MenuRow href="/pengaturan/memori" icon={Brain} title="Memori Ra" detail="Yang Ra ingat tentang kebiasaanmu" />

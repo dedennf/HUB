@@ -24,7 +24,7 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
       </div>
       {message && <p role="alert" className="rounded-xl bg-danger-bg p-3 text-[13px] text-danger-fg">{message}</p>}
       <div className="card p-4"><LoginForm /></div>
-      <p className="text-[12px] text-muted">Masuk tanpa kata sandi. Kode 6 angka dikirim ke email pemilik dan berlaku sekali pakai. Cocok untuk app yang terpasang di laptop atau HP karena tidak perlu membuka tautan.</p>
+      <p className="text-[12px] text-muted">Pertama kali? Masuk lewat email di browser, lalu buat kata sandi di Pengaturan, Kata sandi. Setelah itu app yang terpasang di laptop atau HP cukup memakai email dan kata sandi.</p>
     </main>
   );
 }

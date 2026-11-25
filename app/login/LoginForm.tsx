@@ -1,13 +1,52 @@
 'use client';
 import { useActionState, useState } from 'react';
-import { sendLoginCode, verifyLoginCode, type LoginState } from './actions';
+import { sendLoginCode, signInWithPassword, verifyLoginCode, type LoginState } from './actions';
 
 const IDLE: LoginState = { status: 'idle', step: 'email' };
+const linkButton = 'min-h-11 px-1 text-[13px] font-semibold text-accent-strong disabled:opacity-50';
 
-export function LoginForm() {
+function Status({ state }: { state: LoginState }) {
+  if (!state.message) return null;
+  return (
+    <p role="status" className={state.status === 'error' ? 'text-[13px] text-negative' : 'text-[13px] text-muted'}>
+      {state.message}
+    </p>
+  );
+}
+
+/** Mode bawaan: email dan kata sandi. Tidak bergantung pada email masuk, jadi jalan di app terpasang. */
+function PasswordLogin({ onEmailMode }: { onEmailMode: () => void }) {
+  const [state, action, pending] = useActionState<LoginState, FormData>(signInWithPassword, IDLE);
+  return (
+    <div className="space-y-3">
+      <form action={action} className="space-y-3">
+        <label className="block">
+          <span className="label">Email</span>
+          <input
+            name="email" type="email" required autoComplete="email" inputMode="email" className="input"
+            placeholder="nama@contoh.com" defaultValue={state.email}
+          />
+        </label>
+        <label className="block">
+          <span className="label">Kata sandi</span>
+          <input name="password" type="password" required autoComplete="current-password" className="input" />
+        </label>
+        <button type="submit" className="btn btn-primary w-full" disabled={pending}>
+          {pending ? 'Memeriksa...' : 'Masuk'}
+        </button>
+        <Status state={state} />
+      </form>
+      <button type="button" className={linkButton} onClick={onEmailMode}>
+        Belum punya kata sandi? Masuk lewat email
+      </button>
+    </div>
+  );
+}
+
+/** Cadangan: kode atau tautan dari email. Dipakai sekali untuk membuat kata sandi. */
+function EmailLogin({ onPasswordMode }: { onPasswordMode: () => void }) {
   const [sendState, send, sending] = useActionState<LoginState, FormData>(sendLoginCode, IDLE);
   const [verifyState, verify, verifying] = useActionState<LoginState, FormData>(verifyLoginCode, IDLE);
-  // Kembali ke langkah email tanpa memuat ulang halaman.
   const [editing, setEditing] = useState(false);
   const [lastSent, setLastSent] = useState(sendState);
 
@@ -16,37 +55,34 @@ export function LoginForm() {
     setEditing(false);
   }
 
-  const onCode = sendState.step === 'code' && !editing;
-
-  if (!onCode) {
+  if (sendState.step !== 'code' || editing) {
     return (
-      <form action={send} className="space-y-3">
-        <label className="block">
-          <span className="label">Email</span>
-          <input
-            name="email" type="email" required autoComplete="email" inputMode="email" className="input"
-            placeholder="nama@contoh.com" defaultValue={sendState.email}
-          />
-        </label>
-        <button type="submit" className="btn btn-primary w-full" disabled={sending}>
-          {sending ? 'Mengirim...' : 'Kirim kode masuk'}
-        </button>
-        {sendState.message && (
-          <p role="status" className={sendState.status === 'error' ? 'text-[13px] text-negative' : 'text-[13px] text-muted'}>
-            {sendState.message}
-          </p>
-        )}
-      </form>
+      <div className="space-y-3">
+        <form action={send} className="space-y-3">
+          <label className="block">
+            <span className="label">Email</span>
+            <input
+              name="email" type="email" required autoComplete="email" inputMode="email" className="input"
+              placeholder="nama@contoh.com" defaultValue={sendState.email}
+            />
+          </label>
+          <button type="submit" className="btn btn-primary w-full" disabled={sending}>
+            {sending ? 'Mengirim...' : 'Kirim email masuk'}
+          </button>
+          <Status state={sendState} />
+        </form>
+        <button type="button" className={linkButton} onClick={onPasswordMode}>Masuk dengan kata sandi</button>
+      </div>
     );
   }
 
-  const message = verifyState.status === 'error' ? verifyState.message : sendState.message;
   return (
     <div className="space-y-3">
       <form action={verify} className="space-y-3">
         <input type="hidden" name="email" value={sendState.email} />
         <p className="text-[13px] text-muted">
-          Kode dikirim ke <span className="font-semibold text-fg">{sendState.email}</span>.
+          Email dikirim ke <span className="font-semibold text-fg">{sendState.email}</span>. Kalau isinya kode angka, ketik di bawah.
+          Kalau isinya hanya tautan, buka tautan itu di browser, lalu buat kata sandi di Pengaturan.
         </p>
         <label className="block">
           <span className="label">Kode dari email</span>
@@ -58,23 +94,23 @@ export function LoginForm() {
         <button type="submit" className="btn btn-primary w-full" disabled={verifying}>
           {verifying ? 'Memeriksa...' : 'Masuk'}
         </button>
-        {message && (
-          <p role="status" className={verifyState.status === 'error' ? 'text-[13px] text-negative' : 'text-[13px] text-muted'}>
-            {message}
-          </p>
-        )}
+        <Status state={verifyState.status === 'error' ? verifyState : sendState} />
       </form>
-      <div className="flex justify-between gap-2">
-        <button type="button" className="min-h-11 px-1 text-[13px] font-semibold text-accent-strong disabled:opacity-50" onClick={() => setEditing(true)}>
-          Ganti email
-        </button>
+      <div className="flex flex-wrap justify-between gap-2">
+        <button type="button" className={linkButton} onClick={() => setEditing(true)}>Ganti email</button>
         <form action={send}>
           <input type="hidden" name="email" value={sendState.email} />
-          <button type="submit" className="min-h-11 px-1 text-[13px] font-semibold text-accent-strong disabled:opacity-50" disabled={sending}>
-            {sending ? 'Mengirim...' : 'Kirim ulang kode'}
-          </button>
+          <button type="submit" className={linkButton} disabled={sending}>{sending ? 'Mengirim...' : 'Kirim ulang'}</button>
         </form>
       </div>
+      <button type="button" className={linkButton} onClick={onPasswordMode}>Masuk dengan kata sandi</button>
     </div>
   );
+}
+
+export function LoginForm() {
+  const [mode, setMode] = useState<'password' | 'email'>('password');
+  return mode === 'password'
+    ? <PasswordLogin onEmailMode={() => setMode('email')} />
+    : <EmailLogin onPasswordMode={() => setMode('password')} />;
 }
