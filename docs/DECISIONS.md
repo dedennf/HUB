@@ -578,3 +578,10 @@ Keputusan akhir:
 - Pengecekan pemilik dan `bootstrap_user` ada di `lib/auth-finish.ts`, sehingga tiga jalur masuk melewati langkah yang sama. Email selain pemilik tidak pernah dicoba ke Supabase dan mendapat pesan yang sama dengan sandi salah. Batas percobaan mengikuti pembatas bawaan Supabase Auth.
 
 Login tanpa verifikasi sama sekali tidak dipilih. App ini menyimpan data keuangan dan alamatnya publik, jadi harus ada bukti bahwa yang masuk adalah pemilik. Sesi Supabase diperbarui otomatis, jadi kata sandi hanya diminta saat sesi habis atau setelah keluar.
+
+## D-58 · Server Vercel di Singapura
+**Status: Diputuskan**
+
+Database Supabase ada di Southeast Asia (Singapore), sedangkan fungsi Vercel tanpa pengaturan berjalan di `iad1` (Washington DC). Setiap halaman memuat beberapa query, dan tiap query bolak-balik Amerika ke Singapura, sehingga app terasa lambat. `vercel.json` kini memakai `"regions": ["sin1"]` agar server berjalan di Singapura, dekat dengan database dan dengan pengguna di Indonesia. Paket Hobby mengizinkan satu region.
+
+Membungkus app menjadi aplikasi desktop (Electron atau Tauri) tidak dipilih sebagai perbaikan kecepatan, karena data tetap diambil lewat server yang sama.
