@@ -1,5 +1,5 @@
 // Diagnosa koneksi Gemini dari server (D-45): uji tiap model dengan pesan sederhana, dengan dan tanpa deklarasi tool.
-import type { FunctionDeclaration } from '@google/genai';
+import { GoogleGenAI, type FunctionDeclaration } from '@google/genai';
 import { GeminiModel, ModelError, type GeminiConfig } from './model';
 import { functionDeclarations } from './tools';
 import { transcribeAudio } from './voice';
@@ -8,7 +8,29 @@ export type DiagnoseCase = { model: string; test: string; ok: boolean; ms: numbe
 export type DiagnoseReport = {
   config: { model: string; fallback_model: string | null; thinking_level: string; base_url_set: boolean; api_key_set: boolean };
   cases: DiagnoseCase[];
+  /** Model yang tersedia untuk API key ini, supaya tidak menebak nama model. */
+  available_models?: { text: string[]; live: string[]; error?: string };
 };
+
+/** Daftar model dari ListModels: `text` untuk GEMINI_MODEL dan cadangannya, `live` untuk GEMINI_LIVE_MODEL. */
+export async function availableModels(cfg: Pick<GeminiConfig, 'apiKey' | 'baseUrl'>): Promise<NonNullable<DiagnoseReport['available_models']>> {
+  try {
+    const ai = new GoogleGenAI({ apiKey: cfg.apiKey, httpOptions: { timeout: 15_000, ...(cfg.baseUrl ? { baseUrl: cfg.baseUrl } : {}) } });
+    const text: string[] = [];
+    const live: string[] = [];
+    const pager = await ai.models.list({ config: { pageSize: 100 } });
+    for await (const m of pager) {
+      const name = (m.name ?? '').replace(/^models\//, '');
+      if (!name.startsWith('gemini')) continue;
+      const actions = m.supportedActions ?? [];
+      if (actions.includes('generateContent')) text.push(name);
+      if (actions.includes('bidiGenerateContent')) live.push(name);
+    }
+    return { text: text.sort(), live: live.sort() };
+  } catch (e) {
+    return { text: [], live: [], error: ((e as Error).message || String(e)).slice(0, 300) };
+  }
+}
 
 export async function diagnose(cfg: GeminiConfig, timeoutMs = 25_000): Promise<DiagnoseReport> {
   const tools = functionDeclarations() as FunctionDeclaration[];

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isOwnerEmail } from '@/lib/env';
 import { resolveSessionUser } from '@/lib/auth';
-import { diagnose } from '@/lib/agent/diagnose';
+import { availableModels, diagnose } from '@/lib/agent/diagnose';
 import { geminiConfig } from '@/lib/agent/model';
 import { diagnoseLive } from '@/lib/live/diagnose';
 import { liveConfig, liveModel } from '@/lib/live/config';
@@ -16,7 +16,8 @@ export async function GET() {
   if (!user || !isOwnerEmail(user.email)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const cfg = geminiConfig();
   if (!cfg) return NextResponse.json({ error: 'GEMINI_API_KEY atau GEMINI_MODEL belum diisi di server.' }, { status: 200 });
-  const report = await diagnose(cfg);
+  const [report, models] = await Promise.all([diagnose(cfg), availableModels(cfg)]);
+  report.available_models = models;
   // Fase 8: percakapan langsung bila GEMINI_LIVE_MODEL diisi
   const live = liveModel();
   if (live) {
