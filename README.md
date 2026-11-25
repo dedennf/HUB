@@ -12,7 +12,7 @@ Stack: Next.js 16 (App Router, TypeScript, Tailwind 4), Supabase (Postgres, Auth
 4. **Authentication, URL Configuration**:
    - Site URL: alamat production Vercel, misalnya `https://nama-app.vercel.app`
    - Redirect URLs: `https://nama-app.vercel.app/auth/confirm`, `http://localhost:3000/auth/confirm`, dan pola preview Vercel jika perlu
-5. **Authentication, Emails, Magic Link**: ganti isi template dengan `supabase/templates/magic_link.html`. Template ini menampilkan kode masuk 6 angka (`{{ .Token }}`) untuk diketik di app, ditambah tautan `token_hash` sebagai cadangan saat dibuka di browser.
+5. **Authentication, Emails, Magic Link** (opsional, butuh SMTP sendiri atau paket Pro): ganti isi template dengan `supabase/templates/magic_link.html` agar email memuat kode 6 angka. Tanpa ini login tetap jalan lewat kata sandi (Pengaturan, Kata sandi) dan tautan bawaan.
 6. Jalankan migrasi (lihat di bawah).
 
 ## Variabel lingkungan

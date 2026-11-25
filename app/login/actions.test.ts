@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const auth = { signInWithOtp: vi.fn(), verifyOtp: vi.fn(), signOut: vi.fn() };
+const auth = { signInWithOtp: vi.fn(), verifyOtp: vi.fn(), signInWithPassword: vi.fn(), signOut: vi.fn() };
 const rpc = vi.fn();
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ auth, rpc }) }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers({ host: 'kompas.example.com' }) }));
 const redirect = vi.fn((to: string) => { throw new Error(`REDIRECT ${to}`); });
 vi.mock('next/navigation', () => ({ redirect: (to: string) => redirect(to) }));
 
-const { sendLoginCode, verifyLoginCode } = await import('./actions');
+const { sendLoginCode, verifyLoginCode, signInWithPassword } = await import('./actions');
 
 const OWNER = 'pemilik@kampus.ac.id';
 const form = (o: Record<string, string>) => { const f = new FormData(); for (const [k, v] of Object.entries(o)) f.set(k, v); return f; };
@@ -64,5 +64,24 @@ describe('verifyLoginCode', () => {
     const s = await verifyLoginCode(idle, form({ email: 'orang@lain.com', code: '123456' }));
     expect(s.status).toBe('error');
     expect(auth.verifyOtp).not.toHaveBeenCalled();
+  });
+});
+
+describe('signInWithPassword', () => {
+  it('sandi benar: masuk lalu ke Beranda', async () => {
+    auth.signInWithPassword.mockResolvedValue({ data: { user: { id: 'u1', email: OWNER } }, error: null });
+    await expect(signInWithPassword(idle, form({ email: OWNER, password: 'rahasia123' }))).rejects.toThrow('REDIRECT /');
+    expect(rpc).toHaveBeenCalledWith('bootstrap_user');
+  });
+  it('sandi salah: pesan umum tanpa pindah halaman', async () => {
+    auth.signInWithPassword.mockResolvedValue({ data: { user: null }, error: { status: 400, code: 'invalid_credentials', message: 'x' } });
+    const s = await signInWithPassword(idle, form({ email: OWNER, password: 'salah' }));
+    expect(s.status).toBe('error');
+    expect(redirect).not.toHaveBeenCalled();
+  });
+  it('email lain tidak pernah dicoba ke Supabase', async () => {
+    const s = await signInWithPassword(idle, form({ email: 'orang@lain.com', password: 'x' }));
+    expect(s.status).toBe('error');
+    expect(auth.signInWithPassword).not.toHaveBeenCalled();
   });
 });
