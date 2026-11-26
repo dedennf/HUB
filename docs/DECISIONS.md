@@ -689,3 +689,5 @@ Kunci jawaban tidak dikirim ke browser. Penilaian terjadi di server (`submitList
 Mode tes memutar rekaman sekali tanpa kontrol geser, seperti tes asli. Mode latihan memakai pemutar biasa. Setelah dinilai, transkrip tampil per kalimat beserta terjemahannya, dan terjemahan bisa disembunyikan. Reading juga mendapat terjemahan per paragraf yang baru tampil setelah jawaban diperiksa.
 
 Rotasi skill harian berubah: Rabu menjadi Listening (sebelumnya Speaking Part 1). Speaking Part 1 tetap bisa dilatih dari halaman Speaking. Perkiraan band keseluruhan kini memakai empat skill. Diagnosa menambahkan uji "suara Listening (TTS dua pembicara)".
+
+**Pembaruan D-65.** Model TTS Gemini terbaru menolak permintaan multi-speaker berupa satu teks "Nama: kalimat" (400: *Multi-speaker generation requests must specify speech_metadata.speaker for each text part*). Sekarang tiap kalimat dikirim sebagai `Part` terpisah dengan `speechMetadata.speaker` (dan `style`). Bila model lama menolak format ini dengan 400, permintaan diulang sekali dengan format teks lama. Naskah yang audionya gagal dibuat tetap muncul di daftar "Rekaman sebelumnya" dengan tombol "Buat audio".

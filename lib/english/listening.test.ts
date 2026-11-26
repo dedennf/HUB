@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { listeningSchema } from './ielts-ai';
 import { gapCorrect, listeningBand, normalizeAnswer, pcmToWav, rateFromMime } from './listening';
-import { ttsPrompt } from './tts';
+import { ttsParts, ttsPrompt } from './tts';
 
 describe('jawaban isian Listening', () => {
   it('abaikan huruf besar, tanda baca, spasi, dan artikel di depan', () => {
@@ -40,6 +40,15 @@ describe('audio', () => {
     expect(two).toContain('Tom: Hello.');
     const one = ttsPrompt({ speakers: [{ name: 'Dr Lee', gender: 'male' }], lines: [{ speaker: 'Dr Lee', text: 'Today we discuss bees.' }] });
     expect(one).not.toContain('Dr Lee:');
+  });
+  it('percakapan: tiap kalimat satu part dengan speechMetadata.speaker', () => {
+    const s = { speakers: [{ name: 'Anna', gender: 'female' as const }, { name: 'Tom', gender: 'male' as const }], lines: [{ speaker: 'Anna', text: 'Hi.' }, { speaker: 'Tom', text: 'Hello.' }] };
+    const parts = ttsParts(s);
+    expect(parts).toHaveLength(2);
+    expect(parts.map((p) => p.speechMetadata?.speaker)).toEqual(['Anna', 'Tom']);
+    expect(parts[1].text).toBe('Hello.');
+    expect(ttsParts(s, true)).toEqual([{ text: ttsPrompt(s) }]);
+    expect(ttsParts({ speakers: [s.speakers[0]], lines: [s.lines[0]] })).toHaveLength(1);
   });
 });
 

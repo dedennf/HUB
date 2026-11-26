@@ -1,9 +1,10 @@
 'use client';
 import { Headphones, Play } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useRef, useState, useTransition } from 'react';
 import { createListening, getListening, submitListening, type ListeningResult, type ListeningView } from '@/app/(dashboard)/bahasa/ielts-actions';
 
-type Recent = { id: string; title: string; section: number; best_score: number | null; attempts: number };
+type Recent = { id: string; title: string; section: number; best_score: number | null; attempts: number; hasAudio: boolean };
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const fmt = (b: number) => b.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
@@ -23,6 +24,7 @@ async function fetchAudio(id: string): Promise<{ url: string | null; error?: str
  * Setelah dinilai, transkrip tampil per kalimat dengan terjemahan bahasa Indonesia.
  */
 export function IeltsListener({ recent }: { recent: Recent[] }) {
+  const router = useRouter();
   const [section, setSection] = useState<1 | 4>(1);
   const [mode, setMode] = useState<'tes' | 'latihan'>('tes');
   const [set, setSet] = useState<ListeningView | null>(null);
@@ -44,7 +46,7 @@ export function IeltsListener({ recent }: { recent: Recent[] }) {
     if (!view.data.audioUrl) {
       setStatus(fresh ? 'Ra merekam suaranya (sekitar 20 sampai 40 detik)...' : 'Membuat ulang audio...');
       const a = await fetchAudio(id);
-      if (!a.url) { setError(`${a.error ?? 'Audio tidak bisa dibuat.'} Naskahnya sudah tersimpan, coba lagi dari daftar di bawah.`); setStatus(null); return; }
+      if (!a.url) { setError(`${a.error ?? 'Audio tidak bisa dibuat.'} Naskahnya sudah tersimpan, tekan Buat audio di daftar Rekaman sebelumnya untuk mencoba lagi.`); setStatus(null); router.refresh(); return; }
       view = { ok: true, data: { ...view.data, audioUrl: a.url } };
     }
     setStatus(null);
@@ -214,9 +216,9 @@ export function IeltsListener({ recent }: { recent: Recent[] }) {
                 <button type="button" disabled={busy} onClick={() => open(r.id, false)} className="flex min-h-12 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-bg">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14px] font-semibold" lang="en">{r.title}</span>
-                    <span className="block text-[12px] text-muted">Section {r.section} · {r.attempts ? `skor terbaik ${r.best_score ?? 0}/6 dari ${r.attempts} percobaan` : 'belum dikerjakan'}</span>
+                    <span className="block text-[12px] text-muted">Section {r.section} · {!r.hasAudio ? 'audio belum jadi, ketuk untuk membuat ulang' : r.attempts ? `skor terbaik ${r.best_score ?? 0}/6 dari ${r.attempts} percobaan` : 'belum dikerjakan'}</span>
                   </span>
-                  <span className="text-[13px] font-semibold text-accent-strong">Buka</span>
+                  <span className="text-[13px] font-semibold text-accent-strong">{r.hasAudio ? 'Buka' : 'Buat audio'}</span>
                 </button>
               </li>
             ))}
