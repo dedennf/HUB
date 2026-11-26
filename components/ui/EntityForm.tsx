@@ -25,6 +25,7 @@ export function EntityForm({ action, fields, options, values, id, back, submitLa
   const [ranges, setRanges] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.filter((f) => f.type === 'range').map((f) => [f.name, asString(values[f.name]) || '0'])));
   const err = (name: string) => state.fieldErrors?.[name] && <span id={`${name}-err`} className="mt-1 block text-[12px] text-negative">{state.fieldErrors[name]}</span>;
+  const hintFor = (f: FieldDef) => f.hint && <span id={`${f.name}-hint`} className="mt-1 block text-[12px] text-muted">{f.hint}</span>;
   const describedBy = (f: FieldDef) => [state.fieldErrors?.[f.name] ? `${f.name}-err` : '', f.hint ? `${f.name}-hint` : ''].filter(Boolean).join(' ') || undefined;
 
   return (
@@ -40,6 +41,26 @@ export function EntityForm({ action, fields, options, values, id, back, submitLa
               <input type="checkbox" {...common} defaultChecked={values[f.name] === true} className="h-5 w-5 accent-[var(--accent)]" />
               {f.label}
             </label>
+          );
+        }
+        if (f.type === 'multiselect') {
+          const list = options[f.source ?? ''] ?? [];
+          const chosen = new Set(Array.isArray(values[f.name]) ? (values[f.name] as string[]) : []);
+          return (
+            <fieldset key={f.name} className={span} aria-describedby={describedBy(f)}>
+              <legend className="label">{f.label} <span className="font-normal">(opsional)</span></legend>
+              {list.length ? (
+                <div className="card rows max-h-64 overflow-y-auto">
+                  {list.map((o) => (
+                    <label key={o.value} className="flex min-h-11 items-center gap-3 px-3 py-1.5 text-[14px]">
+                      <input type="checkbox" name={f.name} value={o.value} defaultChecked={chosen.has(o.value)} className="h-5 w-5 shrink-0 accent-[var(--accent)]" />
+                      <span>{o.label}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : <p className="text-[13px] text-muted">{f.emptyLabel ?? 'Belum ada pilihan.'}</p>}
+              {hintFor(f)}{err(f.name)}
+            </fieldset>
           );
         }
         const label = <span className="label">{f.label}{f.required ? '' : <span className="font-normal"> (opsional)</span>}</span>;

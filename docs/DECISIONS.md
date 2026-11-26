@@ -757,3 +757,12 @@ Penyesuaian sebelum memanggil fungsi (`lib/restore.ts`):
 - Kolom yang tidak ada lagi di skema diabaikan, jadi cadangan dari versi lama tetap bisa dipakai.
 
 Saldo akun dihitung ulang oleh trigger yang sama dengan input biasa. Setelah pemulihan, `check_account_balances` dijalankan dan hasilnya ditampilkan. Peristiwa otomasi yang muncul karena baris pulihan dihapus di transaksi yang sama, supaya transaksi dan tugas lama tidak memicu saran slot, peringatan budget, atau deteksi janggal.
+
+## D-71 · Tautan literatur ke target dan ide riset
+**Status: Diputuskan**
+
+Bagian dari D-34. Kolom `readings.linked_target_ids` dan `linked_idea_ids` sudah ada sejak migrasi 0004 dan sudah diisi impor app lama, tetapi belum punya UI. Formulir Literatur sekarang punya dua daftar centang: "Mendukung target" dan "Terkait ide". Ide yang berstatus dibuang tidak ditampilkan sebagai pilihan.
+
+Untuk itu formulir generik (D-31) mendapat tipe field baru `multiselect`, berupa daftar kotak centang dalam satu `fieldset`, dibaca dengan `FormData.getAll`, dan divalidasi `f.uuidList()`. Sumber pilihan baru: `researchTargets` dan `researchIdeas`. Kotak centang dipilih alih-alih `<select multiple>` karena yang kedua sulit dipakai di HP dan tidak memenuhi target sentuh 44 px.
+
+Di halaman Riset, baris target dan ide menampilkan jumlah literatur yang menautkannya. Tautan ini nanti dipakai Fase 10 dan 11 (literatur per bab, Tabel Penelitian Terdahulu).

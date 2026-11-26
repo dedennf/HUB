@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { zonedParts, zonedToIso } from '../time';
 import { f } from './fields';
 
-export type FieldType = 'text' | 'textarea' | 'money' | 'number' | 'range' | 'date' | 'time' | 'select' | 'checkbox' | 'tags' | 'url';
-export type OptionSource = 'courses' | 'accounts' | 'expenseCategories' | 'projects' | 'semesters';
+export type FieldType = 'text' | 'textarea' | 'money' | 'number' | 'range' | 'date' | 'time' | 'select' | 'checkbox' | 'tags' | 'url' | 'multiselect';
+export type OptionSource = 'courses' | 'accounts' | 'expenseCategories' | 'projects' | 'semesters' | 'researchTargets' | 'researchIdeas';
 export type FieldDef = {
   name: string;
   label: string;
@@ -331,16 +331,19 @@ const reading: EntityDef = {
     { name: 'tags', label: 'Tag (pisahkan dengan koma)', type: 'tags' },
     { name: 'claim', label: 'Klaim utama', type: 'textarea' },
     { name: 'notes', label: 'Catatan', type: 'textarea' },
+    { name: 'linked_target_ids', label: 'Mendukung target', type: 'multiselect', source: 'researchTargets', emptyLabel: 'Belum ada target riset.' },
+    { name: 'linked_idea_ids', label: 'Terkait ide', type: 'multiselect', source: 'researchIdeas', emptyLabel: 'Belum ada ide riset.' },
   ],
-  defaults: { verification_status: 'unchecked' },
+  defaults: { verification_status: 'unchecked', linked_target_ids: [], linked_idea_ids: [] },
   schema: z.object({
     title: f.text('Judul', 300), authors: f.optText(300), year: f.optInt(1900, 2100), venue: f.optText(200),
     doi: z.preprocess((v) => (typeof v === 'string' ? v.trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i, '') : v), f.optText(200)),
     verification_status: f.choice(values(LIT_STATUS)), inclusion: f.optChoice(values(LIT_INCLUSION)), project_id: f.optUuid(),
     collection: f.optText(120), url: f.optText(500), tags: f.tags(), claim: f.optText(2000), notes: f.optText(4000),
+    linked_target_ids: f.uuidList(), linked_idea_ids: f.uuidList(),
   }),
   toRow: (v) => v,
-  fromRow: (r) => pick(r, ['title', 'authors', 'year', 'venue', 'doi', 'verification_status', 'inclusion', 'project_id', 'collection', 'url', 'tags', 'claim', 'notes']),
+  fromRow: (r) => pick(r, ['title', 'authors', 'year', 'venue', 'doi', 'verification_status', 'inclusion', 'project_id', 'collection', 'url', 'tags', 'claim', 'notes', 'linked_target_ids', 'linked_idea_ids']),
 };
 
 const supervision: EntityDef = {
@@ -490,7 +493,7 @@ export function getEntity(key: string): EntityDef | null {
 /** Ubah FormData menjadi objek; field tags/checkbox ditangani skema. */
 export function formDataToObject(fd: FormData, def: EntityDef): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const field of def.fields) out[field.name] = fd.get(field.name) ?? (field.type === 'checkbox' ? '' : '');
+  for (const field of def.fields) out[field.name] = field.type === 'multiselect' ? fd.getAll(field.name).map(String) : fd.get(field.name) ?? '';
   return out;
 }
 

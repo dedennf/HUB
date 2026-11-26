@@ -76,7 +76,7 @@ export const getResearchProjects = (s: Db) => rows<T.ResearchProject>(s.from('re
 export const getResearchTargets = (s: Db) => rows<T.ResearchTarget>(s.from('research_targets').select('id,project_id,title,due_date,progress,last_touched_at').order('due_date'));
 export const getResearchNeeds = (s: Db) => rows<T.ResearchNeed>(s.from('research_needs').select('id,project_id,item,kind,status').order('created_at'));
 export const getResearchIdeas = (s: Db) => rows<T.ResearchIdea>(s.from('research_ideas').select('id,project_id,content,source,status').order('created_at'));
-export const getReadings = (s: Db) => rows<T.Reading>(s.from('readings').select('id,title,authors,year,doi,verification_status').order('created_at'));
+export const getReadings = (s: Db) => rows<T.Reading>(s.from('readings').select('id,title,authors,year,doi,verification_status,linked_target_ids,linked_idea_ids').order('created_at'));
 export const getSupervisions = (s: Db) => rows<T.Supervision>(s.from('supervisions').select('id,met_on,supervisor,points,status,next_on').order('met_on'));
 
 /** Semua sumber kalender sekaligus. */
