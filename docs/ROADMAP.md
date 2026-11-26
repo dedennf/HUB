@@ -1,6 +1,6 @@
 # ROADMAP.md · Arah Pengembangan Kompas v2
 
-**Status: Usulan, menunggu persetujuan pemilik.** Belum ada fase di dokumen ini yang boleh dikerjakan sebelum pemilik menyetujui (lihat Bagian 7). Setelah disetujui, fase di sini menjadi lanjutan `SPEC.md` Bagian 14 dan mengikuti aturan yang sama: satu fase = satu branch = satu pull request, keputusan yang menyimpang dicatat di `docs/DECISIONS.md`.
+**Status: Disetujui pemilik (2026-11-26).** Jawaban pemilik ada di Bagian 7 dan D-67. Fase di sini menjadi lanjutan `SPEC.md` Bagian 14 dan mengikuti aturan yang sama: satu fase = satu branch = satu pull request, keputusan yang menyimpang dicatat di `docs/DECISIONS.md`.
 
 ---
 
@@ -8,7 +8,7 @@
 
 Fase 0 sampai 8 sudah tercentang. Kompas sekarang adalah **pencatat yang sangat lengkap**: keuangan dengan saldo konsisten dan undo, kuliah, kalender gabungan, otomasi dengan pg_cron, push, struk, suara, Live API, dan modul IELTS yang cukup dalam.
 
-Ketimpangannya ada di modul **Riset**. Halaman `/riset` hanya 106 baris dan registry Ra untuk riset cuma punya 5 tool (`get_research_progress`, `add_research_target`, `update_research_progress`, `add_research_idea`, `add_research_need`). Padahal pemiliknya mahasiswa tingkat akhir yang sedang mengerjakan skripsi, dan skripsi adalah pekerjaan paling berat, paling panjang, dan paling menentukan di semester ini. Bandingkan dengan modul Bahasa yang punya sesi harian, 4 skill IELTS, TTS, dan estimasi band.
+Ketimpangannya ada di modul **Riset**. Halaman `/riset` hanya 106 baris dan registry Ra untuk riset cuma punya 5 tool (`get_research_progress`, `add_research_target`, `update_research_progress`, `add_research_idea`, `add_research_need`). Padahal pemiliknya mahasiswa D4 Survei Pemetaan dan Informasi Geografis (SPIG) UPI yang sedang mengerjakan Tugas Akhir (TA) kuantitatif tentang evaluasi jarak bebas jaringan SUTT berbasis UAV LiDAR, dan skripsi adalah pekerjaan paling berat, paling panjang, dan paling menentukan di semester ini. Bandingkan dengan modul Bahasa yang punya sesi harian, 4 skill IELTS, TTS, dan estimasi band.
 
 Tabel `readings` sebenarnya sudah kaya (klaim, status verifikasi DOI, inklusi, tautan ke target dan ide), tetapi Ra belum bisa memakainya untuk membantu berpikir.
 
@@ -41,7 +41,7 @@ Yang tetap **tidak** dibuat (keputusan pemilik di SPEC 1, tidak berubah): kalkul
 | 11 | Pustaka Cerdas | cari dan verifikasi literatur lewat API terbuka, matriks literatur, ekspor sitasi | besar |
 | 12 | Ra Pengulas | ulasan paragraf, cek klaim terhadap pustaka, abstrak bahasa Inggris | sedang |
 | 13 | Ra Perencana | blok waktu menulis, tinjauan mingguan lintas modul | sedang |
-| 14 | Data Lapangan (opsional) | transkrip wawancara dan pengodean tematik | besar, perlu persetujuan khusus |
+| 14 | Log Pengolahan Data (opsional) | catatan langkah, parameter, dan uji akurasi pengolahan data untuk Bab III dan IV | sedang |
 
 Fase 9 wajib lebih dulu. Fase 10 dan 11 adalah inti v2. Fase 12 bergantung pada 11 (butuh pustaka yang terverifikasi). Fase 13 bisa disisipkan kapan saja setelah 10.
 
@@ -58,7 +58,7 @@ Tujuannya agar v1 benar-benar selesai sebelum menambah beban baru.
 - [ ] Mode offline PWA minimal: shell app dan data terakhir yang dibaca bisa dibuka tanpa sinyal (hanya baca).
 - [ ] **Meteran Gemini.** Tabel `ai_usage` (tanggal, fitur, model, token masuk, token keluar, status). Halaman diagnosa (D-45) menampilkan pemakaian harian per fitur. Batas harian yang bisa diatur, dengan pesan ramah saat tercapai (SPEC 12 sudah meminta penanganan kuota, ini membuatnya terukur).
 - [ ] **Cadangan otomatis mingguan.** Otomasi bawaan baru: ekspor JSON ke bucket privat `backups` tiap Minggu, simpan 8 terakhir, notifikasi bila gagal. Mencegah kehilangan data yang dulu terjadi (D-01).
-- [ ] **Jaga Supabase tetap hidup.** Proyek Supabase paket gratis dijeda setelah lama tidak aktif. pg_cron yang memanggil `/api/cron/tick` tiap 5 menit seharusnya cukup, tetapi tambahkan pengecekan di halaman diagnosa: kapan tick terakhir berhasil.
+- [x] **Jaga Supabase tetap hidup.** Sudah ada sejak D-64: `/api/cron/tick` menyimpan `cron_last_tick` dan halaman Notifikasi memberi peringatan bila lebih dari 20 menit.
 
 ### Fase 10 · Ruang Skripsi
 
@@ -69,8 +69,8 @@ Halaman baru `/riset/skripsi` (atau tab di `/riset`) yang menjadikan proyek rise
 ```sql
 create table thesis_chapters (
   project_id uuid references research_projects on delete cascade,
-  number int not null,                 -- 1 sampai 5, atau sesuai pedoman kampus
-  title text not null,                 -- "Pendahuluan", "Tinjauan Pustaka", ...
+  number int not null,                 -- 1 sampai 5 sesuai templat TA SPIG
+  title text not null,                 -- "Pendahuluan", "Kajian Pustaka", ...
   status text not null default 'not_started'
     check (status in ('not_started', 'drafting', 'review', 'revising', 'approved')),
   word_target int,
@@ -101,7 +101,15 @@ create table writing_sessions (        -- sesi fokus menulis
 Kolom tambahan: `supervisions.action_items jsonb` (daftar poin revisi dari dosen, masing-masing bisa ditautkan ke `tasks.id` dan `thesis_chapters.id`).
 
 **Fitur:**
-- [ ] Peta jalan menuju sidang: garis waktu milestone dengan hitung mundur ke milestone terdekat. Templat awal bisa dipilih (alur umum S1), semua bisa diubah.
+- [ ] Peta jalan menuju sidang: garis waktu milestone dengan hitung mundur ke milestone terdekat. Templat awal mengikuti alur TA SPIG: proposal TA, seminar proposal, pengambilan dan pengolahan data, sidang TA, revisi. Sidang ditargetkan tahun 2027, tanggal pasti diisi pemilik nanti. Semua bisa diubah.
+- [ ] Templat bab dari `2_TEMPLATE LAPORAN TA_2024_rev 1` Prodi SPIG UPI, disimpan sebagai data awal (bukan hardcode di UI) supaya bisa diganti:
+  - Bab I Pendahuluan: 1.1 Latar Belakang Penelitian, 1.2 Identifikasi Masalah, 1.3 Batasan Masalah, 1.4 Rumusan Masalah, 1.5 Tujuan, 1.6 Manfaat, 1.7 Kerangka Pemikiran
+  - Bab II Kajian Pustaka: 2.1 Penelitian Terdahulu, lalu dasar teori (jumlah bebas)
+  - Bab III Metode Penelitian: 3.1 Lokasi dan Waktu (termasuk Alat dan Bahan), 3.2 Diagram Alir, 3.3 Pelaksanaan, 3.4 Tutorial Penggunaan Software, 3.5 Pengujian Penelitian
+  - Bab IV Hasil dan Pembahasan (subbab bebas)
+  - Bab V Kesimpulan dan Saran: 5.1 Kesimpulan, 5.2 Saran
+  - Bagian pelengkap yang dilacak sebagai daftar periksa: abstrak Indonesia dan Inggris, kata pengantar, daftar pustaka, lampiran, curriculum vitae, surat pernyataan bebas plagiat.
+  Subbab disimpan di tabel `thesis_sections` (chapter_id, number, title, status, note) dengan status yang sama seperti bab.
 - [ ] Papan bab: kartu per bab dengan status, progres kata, hari sejak disentuh, dan tautan ke literatur yang relevan (`readings.linked_target_ids` sudah ada, ditambah tautan ke bab).
 - [ ] Bimbingan jadi tugas: setelah mencatat bimbingan, Ra mengusulkan pemecahan poin revisi menjadi tugas dengan tenggat menjelang bimbingan berikutnya. Lewat kartu konfirmasi, bukan langsung.
 - [ ] Sesi fokus menulis: tombol mulai/selesai (timer gaya pomodoro), isi kata tambahan di akhir sesi. Statistik mingguan: jam menulis, kata, streak. Menyentuh `last_touched_at` bab dan target.
@@ -125,7 +133,11 @@ Ketentuan akses (batas laju, parameter email kontak, kunci API) dicek ulang di d
 - [ ] Cari literatur: kotak pencarian di `/riset` memakai OpenAlex, hasil bisa disimpan ke pustaka dengan satu ketukan (lewat konfirmasi Ra bila dari percakapan). Tampilkan jumlah sitasi dan status akses terbuka.
 - [ ] Matriks literatur: tampilan tabel per literatur dengan kolom teori, metode, sampel atau konteks, temuan, celah (gap), dan relevansi ke bab. Simpan di kolom baru `readings.matrix jsonb`. Ra boleh mengusulkan isi matriks dari abstrak, ditandai "usulan Ra" sampai pengguna menyetujui.
 - [ ] Peta celah penelitian: ringkasan dari kolom celah di matriks, dikelompokkan per tema, sebagai bahan Bab 1 dan Bab 2.
-- [ ] Ekspor sitasi: daftar pustaka APA 7 (bawaan) siap salin, plus ekspor BibTeX dan RIS untuk Zotero atau Mendeley. Gaya lain bisa ditambah lewat pengaturan.
+- [ ] Ekspor sitasi: daftar pustaka APA 7 dengan penyesuaian pedoman TA SPIG, siap salin, plus ekspor BibTeX dan RIS untuk Zotero atau Mendeley (template mewajibkan pengelola sitasi seperti Zotero atau Mendeley). Penyesuaian prodi:
+  - sitasi dalam teks: satu atau dua penulis ditulis namanya, lebih dari dua ditulis "Penulis pertama dkk. (tahun)", bukan "et al."
+  - daftar pustaka: semua penulis ditulis lengkap
+  - setiap sumber di teks harus ada di daftar pustaka, dan sebaliknya
+- [ ] Tabel Penelitian Terdahulu (Tabel 2.1 di templat: No, Nama Peneliti dan Tahun, Judul, Hasil Penelitian) dibuat otomatis dari literatur berstatus `use`, dengan peringatan untuk literatur yang lebih tua dari 10 tahun (aturan templat).
 - [ ] Tool Ra baru: `search_literature` (baca), `fetch_doi_metadata` (baca), `add_reading_from_doi` (tulis), `update_reading_matrix` (tulis).
 - [ ] Aturan di `system-prompt`: Ra hanya menyebut sumber yang id-nya ada di hasil tool. Uji integrasi dengan model tiruan memastikan jawaban yang menyebut sumber di luar hasil tool ditolak oleh pemeriksa keluaran.
 
@@ -135,7 +147,7 @@ Bantuan menulis yang menjaga pengguna tetap sebagai penulis.
 
 - [ ] Ulas paragraf: tempel paragraf draf, Ra memberi umpan balik terstruktur (alur argumen, klaim tanpa sumber, istilah yang tidak konsisten, kalimat yang ambigu) tanpa menulis ulang seluruhnya. Hasil disimpan di `writing_submissions` dengan `kind` baru `thesis_review`.
 - [ ] Cek klaim terhadap pustaka: Ra mencocokkan setiap klaim di paragraf dengan isi `readings` (klaim, catatan, matriks). Keluarannya: klaim yang didukung (dengan sumbernya), klaim yang belum ada sumbernya, dan sitasi di teks yang tidak ada di pustaka ("sitasi yatim").
-- [ ] Abstrak bahasa Inggris: menyambungkan modul Bahasa. Koreksi abstrak (`kind = 'abstract'` sudah ada di skema) dengan kosakata akademik dari pustaka skripsi sendiri masuk ke bank kata.
+- [ ] Abstrak dua bahasa: pemeriksa format sesuai templat (satu paragraf, 200 sampai 250 kata, maksimal 7 kata kunci yang bukan kalimat, berisi informasi umum, tujuan, alasan, metode, dan temuan). Versi bahasa Inggris menyambungkan modul Bahasa. Koreksi abstrak (`kind = 'abstract'` sudah ada di skema) dengan kosakata akademik dari pustaka skripsi sendiri masuk ke bank kata.
 - [ ] Simulasi sidang: mode Live API (Fase 8) dengan peran penguji yang bertanya berdasarkan isi bab dan matriks literatur. Tanpa tools tulis, seperti latihan bicara.
 
 ### Fase 13 · Ra Perencana
@@ -146,14 +158,13 @@ Ra mulai proaktif, tetapi tetap mengusulkan, bukan memutuskan.
 - [ ] Tinjauan mingguan (Minggu malam): satu kartu lintas modul, misalnya jam menulis minggu ini, tugas yang lewat tenggat, pengeluaran yang naik dibanding rata-rata, latihan IELTS yang terlewat, dan tiga usulan untuk minggu depan.
 - [ ] Tinjauan bulanan ringan untuk keuangan dan progres skripsi.
 
-### Fase 14 · Data Lapangan (opsional)
+### Fase 14 · Log Pengolahan Data (opsional)
 
-Hanya dikerjakan bila skripsi pemilik memakai data kualitatif (wawancara, FGD) dan pemilik menyetujui secara eksplisit, karena menyangkut data informan.
+Pengganti rencana awal "Data Lapangan" (transkrip wawancara), karena TA pemilik kuantitatif dan berbasis data UAV LiDAR. Fitur kualitatif tidak dibuat.
 
-- [ ] Unggah rekaman wawancara ke bucket privat, transkripsi lewat Gemini (infrastruktur suara D-47 dan D-63 dipakai ulang).
-- [ ] Anonimisasi: nama informan diganti kode sebelum transkrip disimpan atau dikirim ke Gemini.
-- [ ] Pengodean tematik berbantuan: pengguna menandai kutipan dengan kode, Ra mengusulkan pengelompokan kode menjadi tema. Keputusan akhir selalu di tangan peneliti.
-- [ ] Ekspor kutipan per tema untuk Bab 4.
+- [ ] Catatan pengolahan per langkah: tanggal, software dan versinya, data masukan, parameter, keluaran, dan catatan masalah. Langsung menjadi bahan Bab 3.3 Pelaksanaan dan 3.4 Tutorial Penggunaan Software.
+- [ ] Catatan pengujian: metrik akurasi yang dipakai (misalnya RMSE atau selisih terhadap data acuan) beserta nilainya, sebagai bahan Bab 3.5 dan Bab IV.
+- [ ] Ekspor log menjadi tabel siap salin. Kompas tidak menyimpan file data mentah (point cloud terlalu besar), hanya catatan dan tautan ke lokasi file.
 
 ---
 
@@ -178,11 +189,11 @@ Diukur dari data Kompas sendiri, bukan perasaan:
 | Pelanggaran integritas akademik | Prinsip 2: Ra mengulas, tidak menulis bab utuh |
 | Fitur baru merusak fitur lama | Daftar AUDIT Bagian 7 tetap jadi uji regresi tiap fase |
 
-## 7. Yang perlu dijawab pemilik sebelum Fase 10
+## 7. Jawaban pemilik (2026-11-26)
 
-1. Setuju atau tidak dengan arah "pendamping skripsi" sebagai fokus v2.
-2. Pendekatan skripsi (kualitatif, kuantitatif, atau campuran), karena menentukan perlu tidaknya Fase 14.
-3. Struktur bab sesuai pedoman fakultas (jumlah bab dan judulnya).
-4. Gaya sitasi yang dipakai kampus (bawaan diusulkan APA 7).
-5. Izin memanggil API metadata ilmiah terbuka (Crossref, OpenAlex, Unpaywall) dari server Kompas, dan email kontak yang boleh dipakai untuk API tersebut.
-6. Tanggal target sidang, supaya peta jalan bisa diisi.
+1. Arah pendamping skripsi: **disetujui**.
+2. Pendekatan: **kuantitatif**. Fase 14 diganti menjadi Log Pengolahan Data.
+3. Struktur bab: **templat TA Prodi SPIG UPI** (`2_TEMPLATE LAPORAN TA_2024_rev 1`), rinciannya di Fase 10.
+4. Gaya sitasi: **APA 7**, dengan penyesuaian pedoman prodi ("dkk." dan semua penulis lengkap), rinciannya di Fase 11.
+5. API metadata ilmiah terbuka: **boleh**. Email kontak diisi pemilik lewat env `SCHOLAR_CONTACT_EMAIL`, tidak diambil otomatis.
+6. Target sidang: **tahun 2027**, tanggal pasti menyusul.

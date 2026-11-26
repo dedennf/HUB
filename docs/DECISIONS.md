@@ -701,3 +701,19 @@ Keluhan dari app iPhone: layar sering membesar sendiri lalu bisa digeser ke samp
 3. Pengaman tambahan: `body { overflow-x: clip }` supaya halaman tidak pernah bisa digeser ke samping, `touch-action: manipulation` supaya ketuk dua kali tidak memperbesar layar (cubit untuk zoom tetap bisa), dan padding kiri-kanan mengikuti area aman layar.
 
 Navigasi bawah HP menyimpang dari DESIGN 5.1 (lima slot) menjadi tujuh slot: Beranda, Uang, Agenda, Ra (tengah), Belajar, Riset, Saya. Alasannya, di HP Belajar (Bahasa Inggris) dan Riset sebelumnya tersembunyi di menu Saya, padahal di laptop keduanya tampil di sidebar. Lebar tiap slot sekitar 53 px di layar 375 px dan masih memenuhi target sentuh 44 px. Di sidebar, Bahasa berganti label menjadi "Belajar" supaya sama dengan navigasi HP.
+
+---
+
+# Keputusan Kompas v2 (lihat `docs/ROADMAP.md`)
+
+## D-67 · Arah v2: pendamping Tugas Akhir
+**Status: Diputuskan pemilik (2026-11-26)**
+
+Pemilik menyetujui `docs/ROADMAP.md` (Fase 9 sampai 14). Jawaban pemilik:
+- Pendekatan TA kuantitatif. Rencana Fase 14 untuk data kualitatif (wawancara) diganti Log Pengolahan Data.
+- Struktur bab mengikuti templat laporan TA Prodi Survei Pemetaan dan Informasi Geografis UPI (2024 rev 1). Templat disimpan sebagai data awal yang bisa diubah, bukan teks tetap di UI.
+- Gaya sitasi APA 7 dengan penyesuaian templat prodi. Templat meminta "dkk." untuk lebih dari dua penulis di dalam teks dan semua penulis ditulis lengkap di daftar pustaka. Ini menyimpang dari APA 7 murni ("et al." dan batas 20 penulis), dan aturan prodi yang dipakai. Contoh daftar pustaka di templat sendiri memakai format lama "Penulis (tahun): judul, jurnal, volume, halaman" yang tidak sama dengan APA 7. Kompas mengikuti APA 7 sesuai jawaban pemilik, dan pemilik disarankan memastikan ke pembimbing format mana yang diterima.
+- API Crossref, OpenAlex, dan Unpaywall boleh dipakai. Email kontak untuk API diambil dari env `SCHOLAR_CONTACT_EMAIL` yang diisi pemilik.
+- Sidang ditargetkan 2027 tanpa tanggal pasti. Milestone dibuat tanpa tanggal dan diisi kemudian.
+
+Fase 9 dikerjakan di branch yang sama dengan dokumen ROADMAP karena sesi ini hanya boleh mendorong ke satu branch.
