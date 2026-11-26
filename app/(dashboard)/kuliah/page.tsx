@@ -38,7 +38,7 @@ export default async function KuliahPage() {
           <Link href={`/catat/semester${K}`} className="btn">Semester baru</Link>
         </span>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Section title="Tugas belum selesai" add={{ href: `/catat/tugas${K}`, label: 'Tambah tugas' }}>
           {open.length ? <div className="card rows overflow-hidden">{open.map((t) => <TaskRow key={t.id} {...taskRowProps(t, byId, today)} href={`/catat/tugas/${t.id}${K}`} />)}</div>
             : <div className="card"><EmptyState>Semua tugas beres.</EmptyState></div>}
@@ -71,7 +71,7 @@ export default async function KuliahPage() {
               return (
                 <div key={day}>
                   <p className="mb-1.5 px-1 text-[12px] font-semibold text-muted">{day}</p>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {list.map((x) => <ClassCard key={x.id} title={byId.get(x.course_id)?.name ?? 'Kelas'} start={x.start_time} end={x.end_time} place={x.location} href={`/catat/jadwal/${x.id}${K}`} />)}
                   </div>
                 </div>

@@ -10,7 +10,7 @@ const ITEMS = [
   { href: '/kuliah', label: 'Kuliah', icon: GraduationCap },
   { href: '/riset', label: 'Riset', icon: FlaskConical },
   { href: '/kalender', label: 'Kalender', icon: CalendarDays },
-  { href: '/bahasa', label: 'Bahasa', icon: Languages },
+  { href: '/bahasa', label: 'Belajar', icon: Languages },
   { href: '/otomasi', label: 'Otomasi', icon: Zap },
   { href: '/pengaturan', label: 'Pengaturan', icon: Settings, also: ['/saya'] },
 ];

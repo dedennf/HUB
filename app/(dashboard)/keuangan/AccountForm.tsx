@@ -15,7 +15,7 @@ export function AccountForm({ account }: { account?: Account }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveAccount, { ok: false });
   const err = (k: string) => state.fieldErrors?.[k] && <span className="mt-1 block text-[12px] text-negative">{state.fieldErrors[k]}</span>;
   return (
-    <form action={action} className="grid gap-3 sm:grid-cols-2">
+    <form action={action} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {account && <input type="hidden" name="id" value={account.id} />}
       <label>
         <span className="label">Nama akun</span>

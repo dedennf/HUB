@@ -59,7 +59,7 @@ export default async function BahasaPage() {
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
-      <PageHeader title="Bahasa Inggris" back={{ href: '/saya', label: 'Saya' }} />
+      <PageHeader title="Bahasa Inggris" />
       <p className="-mt-2 text-[13px] text-muted">IELTS Academic · level {LEVEL[profile.level] ?? profile.level} · streak {streakDays(active, today, addDays)} hari</p>
       {profile.goal !== 'ielts' && (
         <p className="rounded-xl bg-warn-bg px-3 py-2 text-[13px] text-warn-fg">Tujuan di pengaturan masih &ldquo;{profile.goal}&rdquo;. Modul ini disusun untuk IELTS. Ubah tujuan ke IELTS di bawah supaya soal dan umpan balik Ra ikut menyesuaikan.</p>

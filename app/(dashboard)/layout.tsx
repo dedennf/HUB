@@ -26,7 +26,7 @@ export default async function DashboardLayout({ children }: LayoutProps<'/'>) {
         <div className="flex min-h-dvh flex-wrap lg:flex-nowrap">
           <Sidebar />
           <div className="min-w-0 flex-1 lg:min-w-[560px]">
-            <main className="mx-auto w-full max-w-[1440px] px-5 pb-32 pt-5 lg:px-8 lg:pb-10 lg:pt-8">{children}</main>
+            <main className="mx-auto w-full max-w-[1440px] pb-32 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] pt-5 lg:px-8 lg:pb-10 lg:pt-8">{children}</main>
           </div>
           <RaPanel />
         </div>

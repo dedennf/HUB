@@ -33,7 +33,7 @@ export function TransactionForm({ accounts, categories, initial }: { accounts: A
 
   return (
     <>
-      <form action={action} className="grid gap-3 sm:grid-cols-2">
+      <form action={action} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {initial.id && <input type="hidden" name="id" value={initial.id} />}
         <fieldset className="grid grid-cols-3 rounded-[14px] bg-track p-1 sm:col-span-2">
           <legend className="sr-only">Jenis transaksi</legend>

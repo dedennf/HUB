@@ -28,7 +28,7 @@ export function EntityForm({ action, fields, options, values, id, back, submitLa
   const describedBy = (f: FieldDef) => [state.fieldErrors?.[f.name] ? `${f.name}-err` : '', f.hint ? `${f.name}-hint` : ''].filter(Boolean).join(' ') || undefined;
 
   return (
-    <form action={formAction} className="grid gap-3 sm:grid-cols-2" noValidate>
+    <form action={formAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2" noValidate>
       {id && <input type="hidden" name="id" value={id} />}
       <input type="hidden" name="back" value={back} />
       {fields.map((f) => {

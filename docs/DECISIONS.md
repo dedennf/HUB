@@ -691,3 +691,13 @@ Mode tes memutar rekaman sekali tanpa kontrol geser, seperti tes asli. Mode lati
 Rotasi skill harian berubah: Rabu menjadi Listening (sebelumnya Speaking Part 1). Speaking Part 1 tetap bisa dilatih dari halaman Speaking. Perkiraan band keseluruhan kini memakai empat skill. Diagnosa menambahkan uji "suara Listening (TTS dua pembicara)".
 
 **Pembaruan D-65.** Model TTS Gemini terbaru menolak permintaan multi-speaker berupa satu teks "Nama: kalimat" (400: *Multi-speaker generation requests must specify speech_metadata.speaker for each text part*). Sekarang tiap kalimat dikirim sebagai `Part` terpisah dengan `speechMetadata.speaker` (dan `style`). Bila model lama menolak format ini dengan 400, permintaan diulang sekali dengan format teks lama. Naskah yang audionya gagal dibuat tetap muncul di daftar "Rekaman sebelumnya" dengan tombol "Buat audio".
+
+## D-66 · Tampilan iPhone (app di layar utama): tanpa zoom, tanpa geser, Belajar di navigasi
+**Status: Diputuskan**
+
+Keluhan dari app iPhone: layar sering membesar sendiri lalu bisa digeser ke samping, tampilan terasa terpotong, dan menu belajar sulit ditemukan. Audit otomatis di lebar 375 dan 390 px menemukan:
+1. Semua kolom isian, termasuk kotak ketik Ra, memakai huruf 14 sampai 15 px. Safari iPhone memperbesar layar setiap kali kolom di bawah 16 px disentuh. Perbaikannya: di layar sentuh (`pointer: coarse`), semua `input`, `select`, dan `textarea` memakai 16 px. Aturan ini ditulis di luar `@layer` supaya menang dari kelas utilitas.
+2. Beberapa grid responsif tidak punya jumlah kolom dasar, sehingga di HP lebarnya mengikuti isi terpanjang. Contohnya halaman Kategori yang 7 px lebih lebar dari layar. Semua grid itu kini memakai `grid-cols-1` di HP.
+3. Pengaman tambahan: `body { overflow-x: clip }` supaya halaman tidak pernah bisa digeser ke samping, `touch-action: manipulation` supaya ketuk dua kali tidak memperbesar layar (cubit untuk zoom tetap bisa), dan padding kiri-kanan mengikuti area aman layar.
+
+Navigasi bawah HP menyimpang dari DESIGN 5.1 (lima slot) menjadi tujuh slot: Beranda, Uang, Agenda, Ra (tengah), Belajar, Riset, Saya. Alasannya, di HP Belajar (Bahasa Inggris) dan Riset sebelumnya tersembunyi di menu Saya, padahal di laptop keduanya tampil di sidebar. Lebar tiap slot sekitar 53 px di layar 375 px dan masih memenuhi target sentuh 44 px. Di sidebar, Bahasa berganti label menjadi "Belajar" supaya sama dengan navigasi HP.
