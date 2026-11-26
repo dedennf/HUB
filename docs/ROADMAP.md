@@ -54,7 +54,8 @@ Fase 9 wajib lebih dulu. Fase 10 dan 11 adalah inti v2. Fase 12 bergantung pada 
 Tujuannya agar v1 benar-benar selesai sebelum menambah beban baru.
 
 - [ ] Tuntaskan item terbuka SPEC 14 (impor production, preview Vercel, uji perangkat asli) dan seluruh SPEC 15.
-- [ ] Kerjakan sisa D-34: subtugas, tautan literatur ke target dan ide di UI, gabung kategori, statistik belajar (persen tepat waktu, streak), grafik cashflow 6 bulan, pemulihan dari cadangan JSON Kompas.
+- [ ] Kerjakan sisa D-34: subtugas, tautan literatur ke target dan ide di UI, gabung kategori, statistik belajar (persen tepat waktu, streak), grafik cashflow 6 bulan.
+- [x] Pemulihan dari cadangan JSON Kompas (D-70).
 - [ ] Mode offline PWA minimal: shell app dan data terakhir yang dibaca bisa dibuka tanpa sinyal (hanya baca).
 - [x] **Meteran Gemini.** Tabel `ai_usage` (tanggal, fitur, model, token masuk, token keluar, status). Halaman diagnosa (D-45) menampilkan pemakaian harian per fitur. Batas harian yang bisa diatur, dengan pesan ramah saat tercapai (SPEC 12 sudah meminta penanganan kuota, ini membuatnya terukur). Selesai, lihat D-68.
 - [x] **Cadangan otomatis mingguan.** Otomasi bawaan baru: ekspor JSON ke bucket privat `backups` tiap Minggu, simpan 8 terakhir, notifikasi bila gagal. Mencegah kehilangan data yang dulu terjadi (D-01). Selesai, lihat D-69.

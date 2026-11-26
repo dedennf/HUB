@@ -5,6 +5,7 @@ import { BACKUP_BUCKET, BACKUPS_KEPT } from '@/lib/backup';
 import { db } from '@/lib/data';
 import { formatDateId } from '@/lib/time';
 import { ImportClient } from './ImportClient';
+import { RestoreClient } from './RestoreClient';
 
 export const metadata: Metadata = { title: 'Cadangan & impor' };
 
@@ -41,6 +42,11 @@ export default async function ImportPage() {
             ))}
           </ul>
         ) : <p className="text-[13px] text-muted">Belum ada cadangan otomatis. Yang pertama dibuat Minggu ini.</p>}
+      </section>
+      <section className="card p-4">
+        <h2 className="h-section mb-1">Pulihkan dari cadangan Kompas</h2>
+        <p className="mb-3 text-[13px] text-muted">Kembalikan data yang terhapus dari cadangan otomatis atau file JSON yang pernah diunduh. Hanya data yang hilang yang ditambahkan. Data yang ada sekarang tidak ditimpa dan tidak dihapus, jadi aman diulang.</p>
+        <RestoreClient stored={auto.map((b) => ({ name: b.name, date: b.date }))} />
       </section>
       <h2 className="h-section mt-2">Impor dari app lama</h2>
       <p className="text-[13px] text-muted">Pindahkan data dari app lama (Hub Pribadi) lewat file cadangan JSON. Data dicek dulu sebelum disimpan, dan impor bisa diulang tanpa membuat data ganda.</p>

@@ -739,3 +739,21 @@ ROADMAP Fase 9, untuk mencegah kehilangan data seperti D-01. Otomasi bawaan ke-1
 Otomasi ini ditandai `auto_write` karena berjalan tanpa konfirmasi. Ia tidak mengubah data pengguna, hanya menulis salinan ke penyimpanan. Notifikasi hanya dikirim bila gagal. Daftar cadangan beserta tautan unduh (signed URL 10 menit) tampil di Pengaturan, Cadangan & impor.
 
 Batas berkas bucket 50 MB. Cadangan Kompas saat ini jauh di bawah itu karena struk dan audio tidak ikut.
+
+## D-70 · Pemulihan dari cadangan Kompas: hanya menambah yang hilang
+**Status: Diputuskan**
+
+Bagian dari D-34 dan ROADMAP Fase 9. Di Pengaturan, Cadangan & impor, pengguna memilih cadangan otomatis (D-69) atau file JSON Kompas. Kompas menampilkan pratinjau berisi jumlah data yang hilang per tabel, lalu memulihkannya setelah pengguna menekan tombol.
+
+Pemulihan sengaja **tidak menimpa dan tidak menghapus** data. Fungsi `restore_kompas_backup` (migrasi 0022) memasukkan baris per tabel dengan `on conflict do nothing`. Akibatnya:
+- Baris dengan id yang sudah ada dilewati. Pemulihan aman diulang dan tidak menggandakan data.
+- Baris yang bentrok dengan aturan unik (pengaturan dengan kunci sama, pola kesalahan yang sama, otomasi bawaan) dilewati, jadi nilai sekarang yang dipakai.
+- Mengembalikan isi Kompas persis ke titik cadangan (termasuk menghapus data yang lebih baru) **tidak** disediakan. Fitur itu menghapus data dan menurut CLAUDE.md harus ditanyakan ke pemilik lebih dulu.
+
+Penyesuaian sebelum memanggil fungsi (`lib/restore.ts`):
+- Kategori bawaan dicocokkan lewat slug. Bila id-nya berbeda, transaksi dan tagihan diarahkan ke kategori yang sudah ada.
+- `receipt_id` transaksi dikosongkan karena foto struk tidak ikut cadangan.
+- Bila sudah ada semester aktif, semester aktif dari cadangan dipulihkan sebagai tidak aktif (hanya boleh satu).
+- Kolom yang tidak ada lagi di skema diabaikan, jadi cadangan dari versi lama tetap bisa dipakai.
+
+Saldo akun dihitung ulang oleh trigger yang sama dengan input biasa. Setelah pemulihan, `check_account_balances` dijalankan dan hasilnya ditampilkan. Peristiwa otomasi yang muncul karena baris pulihan dihapus di transaksi yang sama, supaya transaksi dan tugas lama tidak memicu saran slot, peringatan budget, atau deteksi janggal.

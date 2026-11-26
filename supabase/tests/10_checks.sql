@@ -81,6 +81,36 @@ do $$ begin
   exception when insufficient_privilege then null; end;
 end $$;
 
+-- Pemulihan cadangan Kompas (0022): hanya menambah yang hilang, saldo ikut benar, tanpa peristiwa otomasi.
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', false);
+select public.bootstrap_user();
+do $$
+declare
+  r jsonb;
+  pay jsonb := jsonb_build_object('tables', jsonb_build_object(
+    'accounts', jsonb_build_array(jsonb_build_object('id', 'cccccccc-0000-0000-0000-0000000000a1', 'name', 'Pulih', 'type', 'bank', 'opening_balance', 200000, 'balance', 5, 'created_at', '2026-01-01T00:00:00Z', 'kolom_lama_tidak_ada', 1)),
+    'transactions', jsonb_build_array(jsonb_build_object('id', 'cccccccc-0000-0000-0000-0000000000b1', 'kind', 'expense', 'amount', 50000, 'account_id', 'cccccccc-0000-0000-0000-0000000000a1', 'occurred_at', '2026-01-02T00:00:00Z')),
+    'settings', jsonb_build_array(jsonb_build_object('id', 'cccccccc-0000-0000-0000-0000000000c1', 'key', 'briefing_time', 'value', '"05:00"'::jsonb))
+  ));
+begin
+  r := public.restore_kompas_backup(pay);
+  if (r ->> 'accounts')::int <> 1 or (r ->> 'transactions')::int <> 1 then raise exception 'pemulihan pertama salah: %', r; end if;
+  if (r ->> 'settings')::int <> 0 or (select value #>> '{}' from public.settings where key = 'briefing_time') <> '06:30' then raise exception 'pengaturan yang ada tidak boleh ditimpa'; end if;
+  if (select balance from public.accounts where id = 'cccccccc-0000-0000-0000-0000000000a1') <> 150000 then raise exception 'saldo pulihan salah'; end if;
+  if exists (select 1 from public.automation_events) then raise exception 'pemulihan memicu peristiwa otomasi'; end if;
+  r := public.restore_kompas_backup(pay);
+  if (r ->> 'accounts')::int <> 0 or (r ->> 'transactions')::int <> 0 then raise exception 'pemulihan ulang menggandakan: %', r; end if;
+  if (select balance from public.accounts where id = 'cccccccc-0000-0000-0000-0000000000a1') <> 150000 then raise exception 'saldo berubah setelah pemulihan ulang'; end if;
+  begin
+    perform public.restore_kompas_backup('{"tables": {"agent_actions": [{}]}}'::jsonb);
+    raise exception 'tabel di luar daftar bisa dipulihkan';
+  exception when raise_exception then
+    if sqlerrm not like 'Tabel % tidak boleh dipulihkan' then raise; end if;
+  end;
+end $$;
+
 -- anon tidak punya akses
 reset role;
 set role anon;
