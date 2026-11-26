@@ -13,7 +13,7 @@ export default async function KategoriPage() {
     <div className="flex max-w-3xl flex-col gap-4">
       <PageHeader title="Kategori dan budget" back={{ href: '/pengaturan', label: 'Pengaturan' }} right={<AddButton href="/catat/kategori" label="Tambah kategori" />} />
       <p className="text-[13px] text-muted">Ketuk kategori untuk mengubah nama, kata kunci, atau budget bulanan.</p>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {(['expense', 'income'] as const).map((k) => (
           <Section key={k} title={k === 'expense' ? 'Pengeluaran' : 'Pemasukan'} add={{ href: `/catat/kategori?kind=${k}`, label: `Tambah kategori ${k === 'expense' ? 'pengeluaran' : 'pemasukan'}` }}>
             <div className="card rows overflow-hidden">

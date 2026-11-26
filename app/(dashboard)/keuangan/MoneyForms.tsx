@@ -14,7 +14,7 @@ export function PaymentForm({ action, accounts, defaultAccount, defaultAmount, t
 }) {
   const [s, act, pending] = useActionState<ActionState, FormData>(action, { ok: false });
   return (
-    <form action={act} className="grid gap-3 sm:grid-cols-2">
+    <form action={act} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label>
         <span className="label">Nominal</span>
         <input name="amount" className="input num" inputMode="decimal" defaultValue={defaultAmount || ''} required />

@@ -103,7 +103,7 @@ export default async function BerandaPage() {
 
       <div className="lg:hidden"><QuickActions /></div>
 
-      <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
         <BriefingCard title="Hari ini" items={items} />
         <section className="card hidden p-4 lg:block" aria-label="Tenggat terdekat">
           <div className="mb-1 flex items-center justify-between">
@@ -128,7 +128,7 @@ export default async function BerandaPage() {
 
       {pending.cards.length > 0 && <PendingActions cards={pending.cards} lookups={pending.lookups} />}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-5">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-5">
         <SafeSpendCard s={safe} />
         <EnglishCard done={(day?.done ?? {}) as Partial<Record<SessionStep, boolean>>} skill={(day?.skill as Skill | undefined) ?? skillFor(today)} band={bands.overall} target={english.targetBand} />
         <QuickAccounts accounts={accounts} compact />

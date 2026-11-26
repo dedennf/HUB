@@ -36,7 +36,7 @@ function AgendaLine({ i }: { i: CalendarItem }) {
 
 function WeekColumns({ days, items, today }: { days: string[]; items: Map<string, CalendarItem[]>; today: string }) {
   return (
-    <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-4">
       {days.map((d) => {
         const list = items.get(d) ?? [];
         return (

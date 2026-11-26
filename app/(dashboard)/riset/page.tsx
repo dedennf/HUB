@@ -30,7 +30,7 @@ export default async function RisetPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Riset" back={{ href: '/saya', label: 'Saya' }} right={<AddButton href={`/catat/proyek${K}`} label="Tambah proyek riset" />} />
+      <PageHeader title="Riset" right={<AddButton href={`/catat/proyek${K}`} label="Tambah proyek riset" />} />
       {summary ? (
         <ProgressCard title={summary.project.title} percent={summary.percent} href={`/catat/proyek/${summary.project.id}${K}`}
           detail={`${summary.done} dari ${summary.total} target${summary.nextSupervision ? ` · bimbingan berikutnya ${formatDayShort(summary.nextSupervision)}` : ''}`} />
@@ -41,7 +41,7 @@ export default async function RisetPage() {
         ))}</p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Section title="Target" add={{ href: `/catat/target${K}${pid}`, label: 'Tambah target riset' }}>
           {targets.length ? (
             <div className="card rows overflow-hidden">
