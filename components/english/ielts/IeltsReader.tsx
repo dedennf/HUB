@@ -9,6 +9,7 @@ export function IeltsReader() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [checked, setChecked] = useState<{ band: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showId, setShowId] = useState(true);
   const [busy, start] = useTransition();
   const startedAt = useRef(0);
 
@@ -39,9 +40,22 @@ export function IeltsReader() {
 
   return (
     <div className="flex flex-col gap-4">
-      <article className="card flex flex-col gap-3 p-4" lang="en">
-        <h2 className="font-display text-[19px] font-extrabold leading-snug">{set.title}</h2>
-        {set.passage.split(/\n+/).filter(Boolean).map((para, i) => <p key={i} className="text-[15px] leading-relaxed">{para}</p>)}
+      <article className="card flex flex-col gap-3 p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="font-display text-[19px] font-extrabold leading-snug" lang="en">{set.title}</h2>
+          {checked && set.translation_paragraphs.length > 0 && (
+            <button type="button" aria-pressed={showId} onClick={() => setShowId((v) => !v)} className="min-h-11 shrink-0 px-1 text-[13px] font-semibold text-accent-strong">
+              {showId ? 'Sembunyikan terjemahan' : 'Tampilkan terjemahan'}
+            </button>
+          )}
+        </div>
+        {set.passage.split(/\n+/).filter(Boolean).map((para, i) => (
+          <div key={i} className="flex flex-col gap-1">
+            <p className="text-[15px] leading-relaxed" lang="en">{para}</p>
+            {checked && showId && set.translation_paragraphs[i] && <p className="rounded-xl bg-bg px-3 py-2 text-[13px] leading-relaxed text-muted">{set.translation_paragraphs[i]}</p>}
+          </div>
+        ))}
+        {!checked && <p className="text-[12px] text-muted">Terjemahan bahasa Indonesia muncul setelah jawaban diperiksa.</p>}
       </article>
 
       <section aria-label="Soal" className="flex flex-col gap-3">

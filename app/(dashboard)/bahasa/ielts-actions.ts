@@ -6,10 +6,11 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth';
 import { topicByKey, readingBand, bandOf, type Skill } from '@/lib/english/ielts';
 import {
-  assessWriting, checkSentence, dailyWords, grammarLesson, readingSet, speakingPrompt, writingPrompt,
+  assessWriting, checkSentence, dailyWords, grammarLesson, listeningScript, readingSet, speakingPrompt, writingPrompt,
   type DailyWord, type GrammarLesson, type ReadingSet, type SentenceCheck, type SpeakingPrompt, type WritingAssessment, type WritingPrompt,
 } from '@/lib/english/ielts-ai';
 import { ensureDay, markSkillIfToday, markStep, saveGrammarScore } from '@/lib/english/ielts-store';
+import { gapCorrect, listeningBand } from '@/lib/english/listening';
 import { withModel, type Result } from '@/lib/english/run';
 import { loadProfile, logSession, saveSubmission } from '@/lib/english/store';
 import { createClient } from '@/lib/supabase/server';
@@ -176,4 +177,66 @@ export async function completeSkill(skill: Skill): Promise<void> {
   const { db, today } = await ctx();
   await markSkillIfToday(db, today, skill);
   revalidatePath('/bahasa');
+}
+
+/* ---------------- Listening (D-65) ---------------- */
+
+export type ListeningQuestionView = { type: 'gap' | 'mcq'; prompt: string; options: string[] };
+export type ListeningView = { id: string; section: 1 | 4; title: string; questions: ListeningQuestionView[]; audioUrl: string | null; duration: number | null };
+
+const listenId = z.uuid();
+
+/** Langkah 1: Gemini menulis naskah dan soal. Kunci jawaban disimpan di server, tidak dikirim ke browser. */
+export async function createListening(section: 1 | 4): Promise<Result<{ id: string }>> {
+  const { db, profile } = await ctx();
+  if (section !== 1 && section !== 4) return { ok: false, message: 'Section tidak valid.' };
+  const r = await withModel((m) => listeningScript(m, profile, section, AbortSignal.timeout(50_000)));
+  if (!r.ok) return r;
+  const { title, speakers, lines, questions } = r.data;
+  const { data, error } = await db.from('listening_sets').insert({ section, title, script: { speakers, lines }, questions }).select('id').single();
+  if (error || !data) return { ok: false, message: 'Gagal menyimpan latihan Listening.' };
+  return { ok: true, data: { id: data.id } };
+}
+
+/** Soal tanpa kunci jawaban, plus tautan audio sementara bila audionya sudah dibuat. */
+export async function getListening(id: string): Promise<Result<ListeningView>> {
+  const { db } = await ctx();
+  if (!listenId.safeParse(id).success) return { ok: false, message: 'Latihan tidak valid.' };
+  const { data } = await db.from('listening_sets').select('id,section,title,questions,audio_path,duration_seconds').eq('id', id).maybeSingle();
+  if (!data) return { ok: false, message: 'Latihan tidak ditemukan.' };
+  let audioUrl: string | null = null;
+  if (data.audio_path) {
+    const { data: signed } = await db.storage.from('listening').createSignedUrl(data.audio_path, 60 * 60);
+    audioUrl = signed?.signedUrl ?? null;
+  }
+  const questions = (data.questions as { type: 'gap' | 'mcq'; prompt: string; options?: string[] }[]).map((q) => ({ type: q.type, prompt: q.prompt, options: q.options ?? [] }));
+  return { ok: true, data: { id: data.id, section: data.section, title: data.title, questions, audioUrl, duration: data.duration_seconds } };
+}
+
+export type ListeningResult = {
+  correct: number; total: number; band: number | null;
+  items: { prompt: string; given: string; answer: string; ok: boolean; explanation_id: string }[];
+  lines: { speaker: string; text: string; translation_id: string }[];
+};
+
+/** Nilai jawaban di server, lalu kirim transkrip lengkap dengan terjemahan bahasa Indonesia. */
+export async function submitListening(id: string, answers: string[], seconds: number): Promise<Result<ListeningResult>> {
+  const { db, today } = await ctx();
+  if (!listenId.safeParse(id).success || !Array.isArray(answers)) return { ok: false, message: 'Jawaban tidak valid.' };
+  const { data } = await db.from('listening_sets').select('title,script,questions,best_score,attempts').eq('id', id).maybeSingle();
+  if (!data) return { ok: false, message: 'Latihan tidak ditemukan.' };
+  const qs = data.questions as { type: 'gap' | 'mcq'; prompt: string; answer: string; accept?: string[]; explanation_id: string }[];
+  const items = qs.map((q, i) => {
+    const given = String(answers[i] ?? '').slice(0, 100);
+    const ok = q.type === 'gap' ? gapCorrect(given, q.answer, q.accept ?? []) : given === q.answer;
+    return { prompt: q.prompt, given, answer: q.answer, ok, explanation_id: q.explanation_id };
+  });
+  const correct = items.filter((x) => x.ok).length;
+  const band = listeningBand(correct, qs.length);
+  await db.from('listening_sets').update({ attempts: data.attempts + 1, best_score: Math.max(data.best_score ?? 0, correct) }).eq('id', id);
+  await logSession(db, { kind: 'listening', seconds: Math.min(seconds, 7200), summary: `IELTS Listening "${data.title.slice(0, 80)}": ${correct}/${qs.length}`, score: { band, correct, total: qs.length } });
+  await markSkillIfToday(db, today, 'listening');
+  revalidatePath('/bahasa');
+  const script = data.script as { lines: ListeningResult['lines'] };
+  return { ok: true, data: { correct, total: qs.length, band, items, lines: script.lines } };
 }

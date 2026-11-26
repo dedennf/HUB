@@ -691,7 +691,7 @@ Diperbarui oleh D-60 (persiapan IELTS):
   2. 5 kata akademik baru
   3. satu topik grammar dari kurikulum B1 sampai C1
   4. satu skill tes yang bergilir per hari
-- Latihan per skill: Reading, Writing Task 1 dan 2, Speaking Part 1 sampai 3. Listening menyusul.
+- Latihan per skill: Reading, Listening (suara TTS Gemini, D-65), Writing Task 1 dan 2, Speaking Part 1 sampai 3. Reading dan Listening menampilkan terjemahan bahasa Indonesia setelah dinilai.
 - Pola kesalahan teratas, laporan minggu ini, dan riwayat sesi latihan.
 - Alat lama (Baca jurnal, Tulis bebas, Bank kata, Ngobrol bebas) tetap tersedia.
 

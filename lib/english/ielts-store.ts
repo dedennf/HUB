@@ -54,25 +54,26 @@ export async function saveGrammarScore(db: SupabaseClient, date: string, key: st
   await markStep(db, date, 'grammar');
 }
 
-export type BandSummary = { reading: number | null; writing: number | null; speaking: number | null; listening: number | null; overall: number | null; samples: { reading: number; writing: number; speaking: number } };
+export type BandSummary = { reading: number | null; writing: number | null; speaking: number | null; listening: number | null; overall: number | null; samples: { reading: number; writing: number; speaking: number; listening: number } };
 
 /** Perkiraan band per skill dari latihan 60 hari terakhir (3 nilai terakhir per skill). */
 export async function bandSummary(db: SupabaseClient, today: string): Promise<BandSummary> {
   const since = zonedToIso(addDays(today, -60));
   const [{ data: writings }, { data: sessions }] = await Promise.all([
     db.from('writing_submissions').select('kind,feedback,created_at').in('kind', ['ielts_task1', 'ielts_task2']).gte('created_at', since).order('created_at', { ascending: false }).limit(20),
-    db.from('practice_sessions').select('kind,score,created_at').in('kind', ['reading', 'speaking']).gte('created_at', since).order('created_at', { ascending: false }).limit(40),
+    db.from('practice_sessions').select('kind,score,created_at').in('kind', ['reading', 'speaking', 'listening']).gte('created_at', since).order('created_at', { ascending: false }).limit(40),
   ]);
   const wb = (kind: string) => (writings ?? []).filter((w) => w.kind === kind)
     .map((w) => (w.feedback as { bands?: WritingBands } | null)?.bands).filter((b): b is WritingBands => !!b).map(bandOf);
   const t1 = wb('ielts_task1'), t2 = wb('ielts_task2');
   const sb = (sessions ?? []).filter((s) => s.kind === 'speaking').map((s) => (s.score as { bands?: SpeakingBands } | null)?.bands).filter((b): b is SpeakingBands => !!b).map(bandOf);
   const rb = (sessions ?? []).filter((s) => s.kind === 'reading').map((s) => Number((s.score as { band?: number } | null)?.band)).filter(Number.isFinite);
-  const reading = recentBand(rb), speaking = recentBand(sb);
+  const lb = (sessions ?? []).filter((s) => s.kind === 'listening').map((s) => Number((s.score as { band?: number } | null)?.band)).filter(Number.isFinite);
+  const reading = recentBand(rb), speaking = recentBand(sb), listening = recentBand(lb);
   const writing = writingBand(recentBand(t1), recentBand(t2));
   return {
-    reading, writing, speaking, listening: null,
-    overall: overallBand([reading, writing, speaking]),
-    samples: { reading: rb.length, writing: t1.length + t2.length, speaking: sb.length },
+    reading, writing, speaking, listening,
+    overall: overallBand([reading, listening, writing, speaking]),
+    samples: { reading: rb.length, writing: t1.length + t2.length, speaking: sb.length, listening: lb.length },
   };
 }

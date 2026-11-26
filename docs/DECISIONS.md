@@ -672,3 +672,20 @@ Penyebab push tidak sampai sulit dilihat dari UI. Perbaikannya:
 - Tombol uji menampilkan galat pengiriman per perangkat. Galat 403 diberi keterangan bahwa kunci VAPID berubah.
 - Perangkat yang terdaftar dengan kunci VAPID lama didaftarkan ulang otomatis saat halaman Notifikasi dibuka. Ada juga tombol "Daftarkan ulang".
 - `/api/cron/tick` menyimpan `cron_last_tick` di settings. Halaman Notifikasi menampilkan status kunci VAPID, jumlah perangkat, dan kapan penjadwal terakhir jalan, dengan peringatan bila lebih dari 20 menit atau belum pernah.
+
+## D-65 · IELTS Listening dengan suara TTS Gemini, plus terjemahan
+**Status: Diputuskan**
+
+Listening dibuat dalam dua langkah, supaya masing-masing muat di batas 60 detik fungsi Vercel:
+1. Server action `createListening` meminta Gemini menulis naskah dan 6 soal. Ada dua jenis naskah: Section 1 berupa percakapan dua orang, Section 4 berupa ceramah. Tiap kalimat naskah sudah disertai terjemahan bahasa Indonesia. Naskah dan soal disimpan di tabel `listening_sets` (migrasi 0019).
+2. Route `/api/english/listening/audio` mengubah naskah menjadi suara dengan model TTS Gemini (`GEMINI_TTS_MODEL`). Percakapan memakai dua suara (multi-speaker), ceramah memakai satu suara. Hasilnya disimpan sebagai WAV di bucket privat `listening` (`<user_id>/<set_id>.wav`) dan diputar lewat signed URL. Membuka ulang latihan tidak membuat suara ulang.
+
+Suara bawaan: Kore (perempuan), Puck (laki-laki), dan Charon (dosen). Ketiganya bisa diganti lewat `GEMINI_TTS_VOICE_FEMALE`, `GEMINI_TTS_VOICE_MALE`, dan `GEMINI_TTS_VOICE_LECTURER` bila suara tertentu tidak tersedia.
+
+Kunci jawaban tidak dikirim ke browser. Penilaian terjadi di server (`submitListening`):
+- Isian dicocokkan setelah dirapikan: huruf kecil, tanpa tanda baca, artikel di depan diabaikan. Variasi yang benar juga diterima, misalnya "15" dan "fifteen".
+- Band dihitung dari tabel konversi umum Listening 40 soal, dan diberi label kasar.
+
+Mode tes memutar rekaman sekali tanpa kontrol geser, seperti tes asli. Mode latihan memakai pemutar biasa. Setelah dinilai, transkrip tampil per kalimat beserta terjemahannya, dan terjemahan bisa disembunyikan. Reading juga mendapat terjemahan per paragraf yang baru tampil setelah jawaban diperiksa.
+
+Rotasi skill harian berubah: Rabu menjadi Listening (sebelumnya Speaking Part 1). Speaking Part 1 tetap bisa dilatih dari halaman Speaking. Perkiraan band keseluruhan kini memakai empat skill. Diagnosa menambahkan uji "suara Listening (TTS dua pembicara)".

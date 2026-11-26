@@ -31,7 +31,8 @@ Salin `.env.example` ke `.env.local` untuk lokal, dan isi yang sama di Vercel (S
 | `GEMINI_FALLBACK_MODEL` | opsional: model Gemini cadangan saat model utama penuh (503) atau kuotanya habis |
 | `GEMINI_THINKING_LEVEL` | opsional: `minimal`, `low` (bawaan), `medium`, `high`, atau `off`. Makin rendah makin cepat |
 
-| `GEMINI_LIVE_MODEL` | nama model Gemini yang mendukung Live API, untuk Ngobrol langsung (Fase 8) |
+| `GEMINI_LIVE_MODEL` | nama model Gemini yang mendukung Live API, untuk Ngobrol langsung (Fase 8) dan transkripsi pesan suara (D-63) |
+| `GEMINI_TTS_MODEL` | model TTS Gemini untuk suara IELTS Listening (D-65), mis. `gemini-3.8-flash-tts` |
 | `CRON_SECRET` | teks acak panjang, kunci penjadwal `/api/cron/tick` (Fase 6) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | pasangan kunci push notification (Fase 6) |
 | `VAPID_SUBJECT` | `mailto:` diikuti email pemilik |
