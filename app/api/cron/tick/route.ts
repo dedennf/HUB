@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { withUsage } from '@/lib/ai-usage';
 import { NextResponse } from 'next/server';
 import { defaultModel } from '@/lib/agent/model';
 import { runTick } from '@/lib/automation/engine';
@@ -28,7 +29,8 @@ async function tick(req: Request) {
   let session: Awaited<ReturnType<typeof ownerSession>> | null = null;
   try {
     session = await ownerSession({ url, anonKey, serviceKey, email: ownerEmail() });
-    const report = await runTick(session.db, { model: defaultModel(), push: pushSender() });
+    const db = session.db;
+    const report = await withUsage(db, 'automation', () => runTick(db, { model: defaultModel(), push: pushSender() }));
     if (report.ran.length || report.delivered.sent) console.log('[cron] tick:', JSON.stringify(report));
     // jejak untuk halaman Notifikasi: bukti penjadwal benar-benar jalan
     await session.db.from('settings').upsert({ key: 'cron_last_tick', value: { at: new Date().toISOString(), sent: report.delivered.sent, errors: report.delivered.errors.slice(0, 3) } }, { onConflict: 'user_id,key' });

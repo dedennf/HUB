@@ -717,3 +717,16 @@ Pemilik menyetujui `docs/ROADMAP.md` (Fase 9 sampai 14). Jawaban pemilik:
 - Sidang ditargetkan 2027 tanpa tanggal pasti. Milestone dibuat tanpa tanggal dan diisi kemudian.
 
 Fase 9 dikerjakan di branch yang sama dengan dokumen ROADMAP karena sesi ini hanya boleh mendorong ke satu branch.
+
+## D-68 · Meteran dan batas harian Gemini
+**Status: Diputuskan**
+
+ROADMAP Fase 9. Tabel baru `ai_usage` (migrasi 0020) mencatat satu baris per panggilan `generateContent`: fitur, model, token masuk, token keluar (termasuk token berpikir), dan total dari `usageMetadata`. Isi prompt tidak disimpan.
+
+Cara mencatat: `lib/ai-usage.ts` memasang lingkup `AsyncLocalStorage` lewat `withUsage(db, fitur, fn)` di setiap pintu masuk (route Ra, struk, latihan bicara, audio Listening, `withModel` modul Bahasa, dan tick otomasi). `GeminiModel` dan TTS cukup memanggil `reportUsage()`, jadi tidak ada `db` yang harus dioper ke seluruh fungsi. Di luar lingkup (uji unit, diagnosa) pencatatan diam saja. Galat pencatatan tidak pernah menggagalkan fitur.
+
+Batas harian: pengaturan `ai_daily_token_limit` (0 = tanpa batas) di Pengaturan, Pemakaian Gemini. Dicek sekali di awal lingkup. Bila tercapai, panggilan Gemini gagal dengan alasan baru `budget`, sehingga Ra jatuh ke pengurai lokal dan fitur lain menampilkan pesan ramah, sama seperti kuota habis (SPEC 12). Satu permintaan yang sedang berjalan tidak dipotong di tengah, jadi pemakaian bisa sedikit melewati batas.
+
+Percakapan Live tersambung langsung dari browser ke Gemini dengan token sementara (D-56), jadi tokennya tidak terlihat oleh server dan tidak ikut terhitung. Halaman pemakaian menyebutkan hal ini.
+
+`ai_usage` tidak ikut ekspor cadangan karena hanya log.

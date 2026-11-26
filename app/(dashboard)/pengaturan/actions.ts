@@ -47,6 +47,17 @@ export async function saveSchedule(_prev: SaveState, formData: FormData): Promis
   return ok ? { ok: true, message: 'Jadwal tersimpan. Otomasi menyesuaikan dalam 5 menit.' } : { ok: false, message: 'Gagal menyimpan jadwal.' };
 }
 
+/** Batas token Gemini per hari (ROADMAP Fase 9). 0 berarti tanpa batas. */
+export async function saveAiLimit(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requireUser();
+  const raw = String(formData.get('ai_daily_token_limit') ?? '').replace(/\D/g, '') || '0';
+  const v = SETTING_SCHEMAS.ai_daily_token_limit.safeParse(raw);
+  if (!v.success) return { ok: false, message: 'Isi angka token antara 0 dan 100 juta.' };
+  const ok = await upsert('ai_daily_token_limit', v.data);
+  revalidatePath('/pengaturan/gemini');
+  return ok ? { ok: true, message: v.data ? 'Batas harian tersimpan.' : 'Batas harian dimatikan.' } : { ok: false, message: 'Gagal menyimpan batas.' };
+}
+
 export async function markAllNotificationsRead(): Promise<void> {
   await requireUser();
   const supabase = await createClient();

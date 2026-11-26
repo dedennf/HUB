@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { withUsage } from '@/lib/ai-usage';
 import { z } from 'zod';
 import { resolveSessionUser } from '@/lib/auth';
 import { pcmToWav } from '@/lib/english/listening';
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
   let duration: number | null = null;
   if (!path) {
     try {
-      const { pcm, rate } = await synthesize(data.script as TtsScript, AbortSignal.timeout(55_000));
+      const { pcm, rate } = await withUsage(db, 'english_tts', () => synthesize(data.script as TtsScript, AbortSignal.timeout(55_000)));
       duration = Math.round(pcm.length / 2 / rate);
       path = `${user.id}/${data.id}.wav`;
       const { error } = await db.storage.from('listening').upload(path, pcmToWav(pcm, rate), { contentType: 'audio/wav', upsert: true });

@@ -8,6 +8,7 @@ export const SETTING_SCHEMAS = {
   briefing_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   recap_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   vocab_review_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  ai_daily_token_limit: z.coerce.number().int().min(0).max(100_000_000),
   quiet_hours: z.tuple([z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)]),
 } as const;
 export type SettingKey = keyof typeof SETTING_SCHEMAS;

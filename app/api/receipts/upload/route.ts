@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { withUsage } from '@/lib/ai-usage';
 import { resolveSessionUser } from '@/lib/auth';
 import { toolCtx } from '@/lib/agent/context';
 import { defaultModel } from '@/lib/agent/model';
@@ -31,10 +32,11 @@ export async function POST(req: Request) {
   if (!/^[0-9a-f]{64}$/.test(hash)) return NextResponse.json({ error: 'Hash struk tidak valid.' }, { status: 400 });
   if (await overReceiptLimit(ctx)) return NextResponse.json({ error: `Terlalu banyak struk. Maksimal ${RECEIPTS_PER_MIN} per menit.` }, { status: 429 });
   try {
-    const res = await handleReceiptUpload(ctx, defaultModel(), {
-      userId: user.id, data: Buffer.from(await file.arrayBuffer()), mime: file.type, hash,
+    const data = Buffer.from(await file.arrayBuffer());
+    const res = await withUsage(ctx.db, 'receipt', () => handleReceiptUpload(ctx, defaultModel(), {
+      userId: user.id, data, mime: file.type, hash,
       fileName: file.name?.slice(0, 80), conversationId: UUID.test(conv) ? conv : null,
-    });
+    }));
     return NextResponse.json(res, { status: res.status === 'duplicate' ? 409 : 200 });
   } catch (e) {
     console.error('[receipt] gagal memproses struk:', e);
