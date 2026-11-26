@@ -701,3 +701,68 @@ Keluhan dari app iPhone: layar sering membesar sendiri lalu bisa digeser ke samp
 3. Pengaman tambahan: `body { overflow-x: clip }` supaya halaman tidak pernah bisa digeser ke samping, `touch-action: manipulation` supaya ketuk dua kali tidak memperbesar layar (cubit untuk zoom tetap bisa), dan padding kiri-kanan mengikuti area aman layar.
 
 Navigasi bawah HP menyimpang dari DESIGN 5.1 (lima slot) menjadi tujuh slot: Beranda, Uang, Agenda, Ra (tengah), Belajar, Riset, Saya. Alasannya, di HP Belajar (Bahasa Inggris) dan Riset sebelumnya tersembunyi di menu Saya, padahal di laptop keduanya tampil di sidebar. Lebar tiap slot sekitar 53 px di layar 375 px dan masih memenuhi target sentuh 44 px. Di sidebar, Bahasa berganti label menjadi "Belajar" supaya sama dengan navigasi HP.
+
+---
+
+# Keputusan Kompas v2 (lihat `docs/ROADMAP.md`)
+
+## D-67 · Arah v2: pendamping Tugas Akhir
+**Status: Diputuskan pemilik (2026-11-26)**
+
+Pemilik menyetujui `docs/ROADMAP.md` (Fase 9 sampai 14). Jawaban pemilik:
+- Pendekatan TA kuantitatif. Rencana Fase 14 untuk data kualitatif (wawancara) diganti Log Pengolahan Data.
+- Struktur bab mengikuti templat laporan TA Prodi Survei Pemetaan dan Informasi Geografis UPI (2024 rev 1). Templat disimpan sebagai data awal yang bisa diubah, bukan teks tetap di UI.
+- Gaya sitasi APA 7 dengan penyesuaian templat prodi. Templat meminta "dkk." untuk lebih dari dua penulis di dalam teks dan semua penulis ditulis lengkap di daftar pustaka. Ini menyimpang dari APA 7 murni ("et al." dan batas 20 penulis), dan aturan prodi yang dipakai. Contoh daftar pustaka di templat sendiri memakai format lama "Penulis (tahun): judul, jurnal, volume, halaman" yang tidak sama dengan APA 7. Kompas mengikuti APA 7 sesuai jawaban pemilik, dan pemilik disarankan memastikan ke pembimbing format mana yang diterima.
+- API Crossref, OpenAlex, dan Unpaywall boleh dipakai. Email kontak untuk API diambil dari env `SCHOLAR_CONTACT_EMAIL` yang diisi pemilik.
+- Sidang ditargetkan 2027 tanpa tanggal pasti. Milestone dibuat tanpa tanggal dan diisi kemudian.
+
+Fase 9 dikerjakan di branch yang sama dengan dokumen ROADMAP karena sesi ini hanya boleh mendorong ke satu branch.
+
+## D-68 · Meteran dan batas harian Gemini
+**Status: Diputuskan**
+
+ROADMAP Fase 9. Tabel baru `ai_usage` (migrasi 0020) mencatat satu baris per panggilan `generateContent`: fitur, model, token masuk, token keluar (termasuk token berpikir), dan total dari `usageMetadata`. Isi prompt tidak disimpan.
+
+Cara mencatat: `lib/ai-usage.ts` memasang lingkup `AsyncLocalStorage` lewat `withUsage(db, fitur, fn)` di setiap pintu masuk (route Ra, struk, latihan bicara, audio Listening, `withModel` modul Bahasa, dan tick otomasi). `GeminiModel` dan TTS cukup memanggil `reportUsage()`, jadi tidak ada `db` yang harus dioper ke seluruh fungsi. Di luar lingkup (uji unit, diagnosa) pencatatan diam saja. Galat pencatatan tidak pernah menggagalkan fitur.
+
+Batas harian: pengaturan `ai_daily_token_limit` (0 = tanpa batas) di Pengaturan, Pemakaian Gemini. Dicek sekali di awal lingkup. Bila tercapai, panggilan Gemini gagal dengan alasan baru `budget`, sehingga Ra jatuh ke pengurai lokal dan fitur lain menampilkan pesan ramah, sama seperti kuota habis (SPEC 12). Satu permintaan yang sedang berjalan tidak dipotong di tengah, jadi pemakaian bisa sedikit melewati batas.
+
+Percakapan Live tersambung langsung dari browser ke Gemini dengan token sementara (D-56), jadi tokennya tidak terlihat oleh server dan tidak ikut terhitung. Halaman pemakaian menyebutkan hal ini.
+
+`ai_usage` tidak ikut ekspor cadangan karena hanya log.
+
+## D-69 · Cadangan otomatis mingguan
+**Status: Diputuskan**
+
+ROADMAP Fase 9, untuk mencegah kehilangan data seperti D-01. Otomasi bawaan ke-13 `backup` (aturan, Minggu 02.30 WIB) menulis cadangan JSON yang sama dengan unduhan manual ke bucket privat `backups` (migrasi 0021), path `<user_id>/kompas-YYYY-MM-DD.json`. Hanya 8 cadangan terbaru yang disimpan, yang lebih lama dihapus. Pembuatan isi cadangan dipindah ke `lib/backup.ts` dan dipakai bersama `/api/ekspor/json`.
+
+Otomasi ini ditandai `auto_write` karena berjalan tanpa konfirmasi. Ia tidak mengubah data pengguna, hanya menulis salinan ke penyimpanan. Notifikasi hanya dikirim bila gagal. Daftar cadangan beserta tautan unduh (signed URL 10 menit) tampil di Pengaturan, Cadangan & impor.
+
+Batas berkas bucket 50 MB. Cadangan Kompas saat ini jauh di bawah itu karena struk dan audio tidak ikut.
+
+## D-70 · Pemulihan dari cadangan Kompas: hanya menambah yang hilang
+**Status: Diputuskan**
+
+Bagian dari D-34 dan ROADMAP Fase 9. Di Pengaturan, Cadangan & impor, pengguna memilih cadangan otomatis (D-69) atau file JSON Kompas. Kompas menampilkan pratinjau berisi jumlah data yang hilang per tabel, lalu memulihkannya setelah pengguna menekan tombol.
+
+Pemulihan sengaja **tidak menimpa dan tidak menghapus** data. Fungsi `restore_kompas_backup` (migrasi 0022) memasukkan baris per tabel dengan `on conflict do nothing`. Akibatnya:
+- Baris dengan id yang sudah ada dilewati. Pemulihan aman diulang dan tidak menggandakan data.
+- Baris yang bentrok dengan aturan unik (pengaturan dengan kunci sama, pola kesalahan yang sama, otomasi bawaan) dilewati, jadi nilai sekarang yang dipakai.
+- Mengembalikan isi Kompas persis ke titik cadangan (termasuk menghapus data yang lebih baru) **tidak** disediakan. Fitur itu menghapus data dan menurut CLAUDE.md harus ditanyakan ke pemilik lebih dulu.
+
+Penyesuaian sebelum memanggil fungsi (`lib/restore.ts`):
+- Kategori bawaan dicocokkan lewat slug. Bila id-nya berbeda, transaksi dan tagihan diarahkan ke kategori yang sudah ada.
+- `receipt_id` transaksi dikosongkan karena foto struk tidak ikut cadangan.
+- Bila sudah ada semester aktif, semester aktif dari cadangan dipulihkan sebagai tidak aktif (hanya boleh satu).
+- Kolom yang tidak ada lagi di skema diabaikan, jadi cadangan dari versi lama tetap bisa dipakai.
+
+Saldo akun dihitung ulang oleh trigger yang sama dengan input biasa. Setelah pemulihan, `check_account_balances` dijalankan dan hasilnya ditampilkan. Peristiwa otomasi yang muncul karena baris pulihan dihapus di transaksi yang sama, supaya transaksi dan tugas lama tidak memicu saran slot, peringatan budget, atau deteksi janggal.
+
+## D-71 · Tautan literatur ke target dan ide riset
+**Status: Diputuskan**
+
+Bagian dari D-34. Kolom `readings.linked_target_ids` dan `linked_idea_ids` sudah ada sejak migrasi 0004 dan sudah diisi impor app lama, tetapi belum punya UI. Formulir Literatur sekarang punya dua daftar centang: "Mendukung target" dan "Terkait ide". Ide yang berstatus dibuang tidak ditampilkan sebagai pilihan.
+
+Untuk itu formulir generik (D-31) mendapat tipe field baru `multiselect`, berupa daftar kotak centang dalam satu `fieldset`, dibaca dengan `FormData.getAll`, dan divalidasi `f.uuidList()`. Sumber pilihan baru: `researchTargets` dan `researchIdeas`. Kotak centang dipilih alih-alih `<select multiple>` karena yang kedua sulit dipakai di HP dan tidak memenuhi target sentuh 44 px.
+
+Di halaman Riset, baris target dan ide menampilkan jumlah literatur yang menautkannya. Tautan ini nanti dipakai Fase 10 dan 11 (literatur per bab, Tabel Penelitian Terdahulu).

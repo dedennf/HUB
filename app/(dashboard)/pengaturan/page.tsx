@@ -1,4 +1,4 @@
-import { Bell, Brain, DatabaseBackup, KeyRound, Palette, Tags, UserRound } from 'lucide-react';
+import { Bell, Brain, Gauge, DatabaseBackup, KeyRound, Palette, Tags, UserRound } from 'lucide-react';
 import type { Metadata } from 'next';
 import { Balance } from '@/components/ui/Balance';
 import { MenuRow } from '@/components/ui/MenuRow';
@@ -22,6 +22,7 @@ export default async function PengaturanPage() {
         <MenuRow href="/pengaturan/tampilan" icon={Palette} title="Tampilan" detail="Tema terang, gelap, atau otomatis · privasi saldo" />
         <MenuRow href="/pengaturan/kategori" icon={Tags} title="Kategori dan budget" detail="Kategori pengeluaran dan pemasukan" />
         <MenuRow href="/pengaturan/memori" icon={Brain} title="Memori Ra" detail="Yang Ra ingat tentang kebiasaanmu" />
+        <MenuRow href="/pengaturan/gemini" icon={Gauge} title="Pemakaian Gemini" detail="Token per hari dan batas harian" />
         <MenuRow href="/pengaturan/notifikasi" icon={Bell} title="Notifikasi" detail="Briefing, pengingat, jam tenang" />
         <MenuRow href="/pengaturan/impor" icon={DatabaseBackup} title="Cadangan & impor" detail="Pindahkan data dari app lama" />
       </div>

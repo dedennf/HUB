@@ -61,16 +61,16 @@ describe.skipIf(!run)('mesin otomasi', () => {
     if (userId) await admin.auth.admin.deleteUser(userId);
   });
 
-  it('tick pertama memasang 12 otomasi bawaan, tick berikutnya tidak menggandakan', async () => {
+  it('tick pertama memasang 13 otomasi bawaan, tick berikutnya tidak menggandakan', async () => {
     const r1 = await runTick(db, { push });
-    expect(r1.seeded).toBe(12);
+    expect(r1.seeded).toBe(13);
     const before = (await db.from('automations').select('system_key,next_run_at').eq('system_key', 'briefing').single()).data!.next_run_at;
     const r2 = await runTick(db, { push });
     expect(r2.seeded).toBe(0);
     // jadwal tidak boleh bergeser hanya karena tick berjalan (jsonb mengubah urutan kunci pemicu)
     expect((await db.from('automations').select('next_run_at').eq('system_key', 'briefing').single()).data!.next_run_at).toBe(before);
     const { data } = await db.from('automations').select('system_key,next_run_at,trigger').not('system_key', 'is', null);
-    expect(data).toHaveLength(12);
+    expect(data).toHaveLength(13);
     const briefing = data!.find((a) => a.system_key === 'briefing')!;
     expect(briefing.trigger).toEqual({ type: 'schedule', cron: '30 6 * * *' });
     expect(new Date(briefing.next_run_at!).getTime()).toBeGreaterThan(Date.now());
@@ -80,8 +80,8 @@ describe.skipIf(!run)('mesin otomasi', () => {
     await db.from('automations').update({ next_run_at: new Date(Date.now() - 60_000).toISOString() }).not('system_key', 'is', null);
     const [a, b] = await Promise.all([db.rpc('claim_due_automations', { lease_seconds: 600 }), db.rpc('claim_due_automations', { lease_seconds: 600 })]);
     const ids = [...(a.data ?? []), ...(b.data ?? [])].map((x: { id: string }) => x.id);
-    expect(ids).toHaveLength(12);
-    expect(new Set(ids).size).toBe(12);
+    expect(ids).toHaveLength(13);
+    expect(new Set(ids).size).toBe(13);
   });
 
   it('pengingat tenggat bertingkat sekali per tahap, tugas lewat tenggat ditandai', async () => {

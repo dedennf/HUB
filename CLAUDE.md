@@ -11,6 +11,7 @@ Baca seluruhnya sebelum mulai:
 2. `docs/DESIGN.md`: panduan tampilan, wajib sebelum menyentuh UI. Rujukan visualnya `docs/design/mockups/*.dc.html` (hanya untuk dilihat, jangan disalin ke app) dan aset merek di `public/brand/`. Soal tampilan, DESIGN.md yang berlaku. Soal data dan perilaku, SPEC.md yang berlaku.
 3. `docs/DECISIONS.md`: keputusan yang menyimpang dari SPEC dan alasannya.
 4. `docs/AUDIT.md`: kondisi app lama dan daftar fitur lama yang wajib tetap berjalan.
+5. `docs/ROADMAP.md`: arah pengembangan v2 (Fase 9 dan seterusnya). Hanya dikerjakan setelah statusnya disetujui pemilik.
 
 ## Aturan
 - Kerjakan per fase sesuai `SPEC.md` Bagian 14. Satu fase = satu branch = satu pull request.

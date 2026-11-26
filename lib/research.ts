@@ -24,3 +24,14 @@ export function summarizeProject(projects: ResearchProject[], targets: ResearchT
 export function daysUntouched(lastTouched: string | null, today: string): number | null {
   return lastTouched ? diffDays(today, zonedParts(lastTouched).date) : null;
 }
+
+/** Jumlah literatur yang menautkan tiap target dan ide (D-34: tautan literatur ke target dan ide). */
+export function linkedReadingCounts(readings: { linked_target_ids?: string[]; linked_idea_ids?: string[] }[]): { targets: Map<string, number>; ideas: Map<string, number> } {
+  const targets = new Map<string, number>();
+  const ideas = new Map<string, number>();
+  for (const r of readings) {
+    for (const id of new Set(r.linked_target_ids ?? [])) targets.set(id, (targets.get(id) ?? 0) + 1);
+    for (const id of new Set(r.linked_idea_ids ?? [])) ideas.set(id, (ideas.get(id) ?? 0) + 1);
+  }
+  return { targets, ideas };
+}

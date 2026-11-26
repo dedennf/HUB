@@ -38,9 +38,9 @@ describe('jam tenang (SPEC 8.1)', () => {
 });
 
 describe('aturan bawaan', () => {
-  it('12 otomasi SPEC 8.5 dengan kunci unik', () => {
-    expect(SYSTEM_AUTOMATIONS).toHaveLength(12);
-    expect(new Set(SYSTEM_AUTOMATIONS.map((d) => d.key)).size).toBe(12);
+  it('12 otomasi SPEC 8.5 plus cadangan otomatis (ROADMAP Fase 9), kunci unik', () => {
+    expect(SYSTEM_AUTOMATIONS).toHaveLength(13);
+    expect(new Set(SYSTEM_AUTOMATIONS.map((d) => d.key)).size).toBe(13);
     expect(SYSTEM_AUTOMATIONS.find((d) => d.key === 'briefing')!.trigger({ briefing_time: '05:45' })).toEqual({ type: 'schedule', cron: '45 5 * * *' });
   });
   it('tahap tenggat: H-3, H-1, 3 jam', () => {

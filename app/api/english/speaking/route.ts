@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { withUsage } from '@/lib/ai-usage';
 import { resolveSessionUser } from '@/lib/auth';
 import { defaultModel, ModelError } from '@/lib/agent/model';
 import { SERVER_SILENCE_RMS, wavPeakRms } from '@/lib/agent/voice';
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   if (!model) return NextResponse.json({ error: 'Ra belum tersambung ke Gemini, latihan bicara belum bisa dinilai.' }, { status: 503 });
   try {
     const profile = await loadProfile(db);
-    const fb = await evaluateSpeaking(model, profile, { question, audio: { data, mime: mime === 'audio/x-wav' ? 'audio/wav' : mime } }, AbortSignal.timeout(50_000));
+    const fb = await withUsage(db, 'english', () => evaluateSpeaking(model, profile, { question, audio: { data, mime: mime === 'audio/x-wav' ? 'audio/wav' : mime } }, AbortSignal.timeout(50_000)));
     if (!fb.heard_speech || !fb.transcript.trim()) return NextResponse.json({ error: 'Ucapanmu tidak tertangkap. Coba rekam lagi.' }, { status: 422 });
     await recordMistakes(db, fb.grammar, new Date());
     await logSession(db, { kind: 'speaking', seconds, summary: question, score: { ...(fb.score ?? {}), transcript: fb.transcript.slice(0, 1000) } });
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
   } catch (e) {
     if (e instanceof ModelError) {
       console.error('[english] penilaian bicara gagal:', e.reason, e.detail);
-      return NextResponse.json({ error: e.reason === 'quota' ? 'Kuota Gemini habis. Coba lagi nanti.' : 'Ra tidak bisa menilai sekarang. Coba lagi sebentar.' }, { status: 503 });
+      return NextResponse.json({ error: e.reason === 'quota' ? 'Kuota Gemini habis. Coba lagi nanti.' : e.reason === 'budget' ? 'Batas pemakaian Gemini hari ini sudah tercapai.' : 'Ra tidak bisa menilai sekarang. Coba lagi sebentar.' }, { status: 503 });
     }
     console.error('[english] penilaian bicara galat:', e);
     return NextResponse.json({ error: 'Hasil penilaian tidak terbaca. Coba lagi.' }, { status: 500 });

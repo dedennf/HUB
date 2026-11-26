@@ -1,4 +1,5 @@
 // Antarmuka model untuk loop agen. Implementasi nyata memakai Gemini (@google/genai), uji memakai model tiruan.
+import { overDailyBudget, reportUsage, usageFrom } from '@/lib/ai-usage';
 import { ApiError, GoogleGenAI, ThinkingLevel as GenaiThinkingLevel, type Content, type FunctionDeclaration } from '@google/genai';
 
 export type { Content };
@@ -19,7 +20,7 @@ export interface AgentModel {
 /** Galat model yang ramah ditampilkan (SPEC 12: kuota habis, timeout). */
 export class ModelError extends Error {
   /** `detail`: galat asli (nama, status, pesan) untuk log server. Tidak berisi API key. */
-  constructor(public readonly reason: 'not_configured' | 'quota' | 'timeout' | 'rejected' | 'unavailable', message: string, public readonly detail = '') {
+  constructor(public readonly reason: 'not_configured' | 'quota' | 'budget' | 'timeout' | 'rejected' | 'unavailable', message: string, public readonly detail = '') {
     super(message);
   }
 }
@@ -99,6 +100,8 @@ export class GeminiModel implements AgentModel {
   }
 
   private async once(req: ModelRequest, model: string): Promise<ModelTurn> {
+    // batas token harian yang diatur pemilik (ROADMAP Fase 9): berhenti sebelum memanggil Gemini
+    if (overDailyBudget()) throw new ModelError('budget', 'Batas pemakaian Gemini hari ini sudah tercapai.', 'daily token limit');
     try {
       const res = await this.ai.models.generateContent({
         model,
@@ -120,6 +123,7 @@ export class GeminiModel implements AgentModel {
       const functionCalls = parts.filter((p) => p.functionCall?.name).map((p) => ({ id: p.functionCall!.id, name: p.functionCall!.name!, args: p.functionCall!.args ?? {} }));
       const text = parts.filter((p) => p.text && !p.thought).map((p) => p.text).join('').trim();
       this.lastServedBy = model;
+      reportUsage(usageFrom(model, res.usageMetadata));
       return { content: { role: 'model', parts }, functionCalls, text };
     } catch (e) {
       const err = e as Error & { status?: number; cause?: { code?: string; message?: string } };

@@ -2,6 +2,8 @@
 import { createHash } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth';
+import { BACKUP_BUCKET } from '@/lib/backup';
+import { countMissing, kompasBackup, prepareRestore, type PreparedRestore, type RestoreTable } from '@/lib/restore';
 import { importOverrides, legacyBackup, type ImportOverrides } from '@/lib/legacy/schema';
 import { transformLegacyBackup, type ImportWarning, type TransformResult } from '@/lib/legacy/transform';
 import { formatRupiah } from '@/lib/money';
@@ -130,4 +132,85 @@ export async function runImport(text: string, overrides: unknown): Promise<Impor
       name: b.name, expected: b.balance, actual: balById.get(idByLegacy.get(b.legacyId) ?? '') ?? null,
     })),
   };
+}
+
+/* ---------------- Pemulihan dari cadangan Kompas (D-70) ---------------- */
+
+export type RestoreSource = { kind: 'file'; text: string } | { kind: 'stored'; name: string };
+export type RestorePreview = {
+  ok: true;
+  exported: string;
+  counts: { table: string; total: number; missing: number }[];
+  missing: number;
+  mergedCategories: number;
+  ignored: string[];
+};
+export type RestoreOutcome = { ok: true; inserted: { table: string; n: number }[]; balancesOk: boolean };
+
+async function loadRestore(source: RestoreSource): Promise<Fail | { prepared: PreparedRestore; exported: string }> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  let text: string;
+  if (source.kind === 'stored') {
+    if (!/^kompas-\d{4}-\d{2}-\d{2}\.json$/.test(source.name)) return { ok: false, message: 'Nama cadangan tidak valid.' };
+    const { data, error } = await supabase.storage.from(BACKUP_BUCKET).download(`${user.id}/${source.name}`);
+    if (error || !data) return { ok: false, message: 'Cadangan tidak bisa dibuka dari penyimpanan.' };
+    text = await data.text();
+  } else {
+    text = source.text;
+  }
+  let json: unknown;
+  try { json = JSON.parse(text); } catch { return { ok: false, message: 'File bukan JSON yang valid.' }; }
+  const parsed = kompasBackup.safeParse(json);
+  if (!parsed.success) return { ok: false, message: 'File ini bukan cadangan Kompas. Untuk cadangan app lama, pakai Impor dari app lama di bawah.' };
+  const boot = await supabase.rpc('bootstrap_user');
+  if (boot.error) return { ok: false, message: 'Gagal menyiapkan data awal. Coba lagi.' };
+  const [{ data: cats, error: e1 }, { data: sem, error: e2 }] = await Promise.all([
+    supabase.from('categories').select('id,slug').not('slug', 'is', null),
+    supabase.from('semesters').select('id').eq('is_active', true).maybeSingle(),
+  ]);
+  if (e1 || e2) return { ok: false, message: 'Gagal membaca data yang sudah ada.' };
+  const prepared = prepareRestore(parsed.data, {
+    categoryBySlug: new Map((cats ?? []).map((c) => [c.slug as string, c.id as string])),
+    activeSemesterId: (sem?.id as string | undefined) ?? null,
+  });
+  return { prepared, exported: parsed.data.exported };
+}
+
+/** Semua id yang sudah ada di satu tabel, dibaca per 1000 baris (batas bawaan Supabase). */
+async function existingIds(supabase: Awaited<ReturnType<typeof createClient>>, table: string): Promise<Set<string>> {
+  const ids = new Set<string>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from(table).select('id').order('id').range(from, from + 999);
+    if (error) throw new Error(`Gagal membaca ${table}`);
+    for (const r of data ?? []) ids.add(r.id as string);
+    if (!data || data.length < 1000) return ids;
+  }
+}
+
+export async function previewRestore(source: RestoreSource): Promise<RestorePreview | Fail> {
+  const p = await loadRestore(source);
+  if ('ok' in p) return p;
+  const supabase = await createClient();
+  const tables = Object.keys(p.prepared.tables) as RestoreTable[];
+  let have: Partial<Record<RestoreTable, Set<string>>>;
+  try {
+    have = Object.fromEntries(await Promise.all(tables.map(async (t) => [t, await existingIds(supabase, t)] as const)));
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+  const counts = Object.entries(countMissing(p.prepared.tables, have)).map(([table, c]) => ({ table, ...c! }));
+  return { ok: true, exported: p.exported, counts, missing: counts.reduce((n, c) => n + c.missing, 0), mergedCategories: p.prepared.mergedCategories, ignored: p.prepared.ignored };
+}
+
+export async function runRestore(source: RestoreSource): Promise<RestoreOutcome | Fail> {
+  const p = await loadRestore(source);
+  if ('ok' in p) return p;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('restore_kompas_backup', { payload: { tables: p.prepared.tables } });
+  if (error) return { ok: false, message: `Pemulihan gagal dan tidak ada data yang berubah. (${error.message})` };
+  const { data: check } = await supabase.rpc('check_account_balances');
+  const balancesOk = ((check ?? []) as { stored: number; computed: number }[]).every((r) => r.stored === r.computed);
+  revalidatePath('/', 'layout');
+  return { ok: true, inserted: Object.entries((data ?? {}) as Record<string, number>).map(([table, n]) => ({ table, n })), balancesOk };
 }

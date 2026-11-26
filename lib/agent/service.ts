@@ -72,7 +72,7 @@ export async function overRateLimit(ctx: ToolCtx): Promise<boolean> {
 export const AGENT_BUDGET_MS = 40_000;
 
 const OFFLINE_REASON: Record<ModelError['reason'], string> = {
-  not_configured: 'Gemini belum diatur', quota: 'kuota habis', timeout: 'Gemini terlalu lama menjawab', rejected: 'permintaan ditolak Gemini', unavailable: 'Gemini tidak bisa dihubungi',
+  not_configured: 'Gemini belum diatur', quota: 'kuota habis', budget: 'batas harian Gemini di Kompas tercapai', timeout: 'Gemini terlalu lama menjawab', rejected: 'permintaan ditolak Gemini', unavailable: 'Gemini tidak bisa dihubungi',
 };
 
 export async function handleMessage(ctx: ToolCtx, model: AgentModel | null, text: string, conversationId: string | null, opts: {

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { withUsage } from '@/lib/ai-usage';
 import { z } from 'zod';
 import { resolveSessionUser } from '@/lib/auth';
 import { toolCtx } from '@/lib/agent/context';
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
   const steps = Number(await ctx.db.from('settings').select('value').eq('key', 'agent_max_steps').maybeSingle().then((r) => r.data?.value));
   const maxSteps = Number.isInteger(steps) && steps > 0 ? Math.min(steps, 12) : 6;
   try {
-    const res = await handleMessage(ctx, defaultModel(), parsed.data.text, parsed.data.conversation_id ?? null, { maxSteps, signal: req.signal, audio });
+    const res = await withUsage(ctx.db, 'agent', () => handleMessage(ctx, defaultModel(), parsed.data.text, parsed.data.conversation_id ?? null, { maxSteps, signal: req.signal, audio }));
     return NextResponse.json(res);
   } catch (e) {
     console.error('[agent] gagal memproses pesan:', e);

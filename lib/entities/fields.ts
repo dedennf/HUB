@@ -36,6 +36,8 @@ export const f = {
     (v) => String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean),
     z.array(z.string().max(60)).max(30),
   ),
+  /** Daftar id dari field multiselect (kotak centang). Duplikat dibuang. */
+  uuidList: () => z.preprocess((v) => [...new Set((Array.isArray(v) ? v : []).map(String).filter(Boolean))], z.array(z.uuid('Pilihan tidak valid.')).max(200)),
   choice: <T extends readonly [string, ...string[]]>(values: T) => z.enum(values, { error: 'Pilihan tidak valid.' }),
   optChoice: <T extends readonly [string, ...string[]]>(values: T) => z.preprocess(blankToNull, z.enum(values, { error: 'Pilihan tidak valid.' }).nullable()),
 };

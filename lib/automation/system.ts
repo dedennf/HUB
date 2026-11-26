@@ -4,6 +4,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { proposeAction } from '@/lib/agent/actions';
 import { callTool } from '@/lib/agent/executor';
+import { writeBackup } from '@/lib/backup';
 import { formatRp } from '@/lib/format';
 import type { NotificationInput } from '@/lib/notify';
 import { addDays, isoWeekday, zonedParts, zonedToIso } from '@/lib/time';
@@ -255,6 +256,20 @@ async function busyWeek(env: TickEnv): Promise<RunOutput> {
   return ok(`${week.length} tenggat, ${exams} ujian`, Number(n));
 }
 
+/** Cadangan otomatis (ROADMAP Fase 9): JSON ke bucket privat, simpan 8 terakhir. Notifikasi hanya bila gagal. */
+async function backup(env: TickEnv): Promise<RunOutput> {
+  const { data: auth } = await env.db.auth.getUser();
+  if (!auth.user) return ok('Sesi pemilik tidak ditemukan, cadangan dilewati', 0, { skipped: true });
+  try {
+    const r = await writeBackup(env.db, auth.user.id, env.today, env.now);
+    return ok(`Cadangan ${r.rows} baris tersimpan${r.pruned ? `, ${r.pruned} cadangan lama dihapus` : ''}`);
+  } catch (e) {
+    const n = await env.notify({ title: 'Cadangan otomatis gagal', body: `${(e as Error).message.slice(0, 160)}. Unduh cadangan manual di Pengaturan.`, url: '/pengaturan/impor', category: 'automation', dedupe_key: `backup:${env.today}` });
+    void n;
+    throw e;
+  }
+}
+
 export const SYSTEM_AUTOMATIONS: SystemDef[] = [
   { key: 'briefing', name: 'Briefing pagi', mode: 'agent', description: 'Kuliah hari ini, tenggat terdekat, tagihan, saldo kritis, kosakata', trigger: (s) => ({ type: 'schedule', cron: dailyCron(s.briefing_time, '06:30') }), run: briefing },
   { key: 'recap', name: 'Rekap malam', mode: 'agent', description: 'Pengeluaran hari ini, tugas selesai, persiapan besok', trigger: (s) => ({ type: 'schedule', cron: dailyCron(s.recap_time, '21:00') }), run: recap },
@@ -268,5 +283,6 @@ export const SYSTEM_AUTOMATIONS: SystemDef[] = [
   { key: 'weekly', name: 'Rekap mingguan', mode: 'agent', description: 'Arus uang, progres riset, progres bahasa', trigger: () => ({ type: 'schedule', cron: '0 19 * * 0' }), run: weekly },
   { key: 'vocab', name: 'Review kosakata', mode: 'rule', description: 'Jumlah kata yang jatuh tempo', trigger: (s) => ({ type: 'schedule', cron: dailyCron(s.vocab_review_time, '19:30') }), run: vocabReview },
   { key: 'busy_week', name: 'Penyeimbang minggu padat', mode: 'agent', description: 'Minggu padat tugas atau ujian: saran mengurangi beban lain', trigger: () => ({ type: 'schedule', cron: '0 6 * * 1' }), run: busyWeek },
+  { key: 'backup', name: 'Cadangan otomatis', mode: 'rule', auto_write: true, description: 'Tiap Minggu dini hari, simpan 8 cadangan terakhir di penyimpanan privat', trigger: () => ({ type: 'schedule', cron: '30 2 * * 0' }), run: backup },
 ];
 export const systemByKey = new Map(SYSTEM_AUTOMATIONS.map((d) => [d.key, d]));

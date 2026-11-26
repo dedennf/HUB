@@ -4,16 +4,10 @@ import { ImportPreview } from '@/components/ui/ImportPreview';
 import { useState, useTransition } from 'react';
 import { formatRupiah } from '@/lib/money';
 import type { ImportOverrides } from '@/lib/legacy/schema';
+import { tableLabel } from './labels';
 import { previewImport, runImport, type ImportOutcome, type ImportPreview as PreviewData } from './actions';
 
-const LABEL: Record<string, string> = {
-  accounts: 'Akun', categories: 'Kategori', transactions: 'Transaksi', investments: 'Investasi', bills: 'Tagihan',
-  savings_goals: 'Target tabungan', debts: 'Utang & piutang', sinking_funds: 'Biaya sejati', semesters: 'Semester',
-  courses: 'Mata kuliah', course_schedules: 'Jadwal kelas', materials: 'Materi', tasks: 'Tugas', task_work_slots: 'Rencana kerja',
-  holidays: 'Libur', research_projects: 'Proyek riset', research_needs: 'Kebutuhan riset', research_ideas: 'Ide riset',
-  research_targets: 'Target riset', readings: 'Literatur', supervisions: 'Bimbingan', events: 'Acara', agent_memory: 'Catatan untuk asisten',
-};
-const label = (t: string) => LABEL[t] ?? t;
+const label = tableLabel;
 
 const EMPTY: ImportOverrides = { transactionDates: {}, semesterDates: {}, billAccounts: {} };
 

@@ -52,7 +52,7 @@ export async function signedReceiptUrl(db: SupabaseClient, path: string, seconds
 }
 
 const OFFLINE: Record<ModelError['reason'], string> = {
-  not_configured: 'Gemini belum diatur', quota: 'kuota Gemini habis', timeout: 'Gemini terlalu lama menjawab', rejected: 'permintaan ditolak Gemini', unavailable: 'Gemini tidak bisa dihubungi',
+  not_configured: 'Gemini belum diatur', quota: 'kuota Gemini habis', budget: 'batas harian Gemini di Kompas tercapai', timeout: 'Gemini terlalu lama menjawab', rejected: 'permintaan ditolak Gemini', unavailable: 'Gemini tidak bisa dihubungi',
 };
 
 export async function handleReceiptUpload(ctx: ToolCtx, model: AgentModel | null, input: {

@@ -1,5 +1,6 @@
 // Suara untuk IELTS Listening (D-65) dengan model TTS Gemini (GEMINI_TTS_MODEL).
 // Percakapan memakai dua suara (multi-speaker), ceramah memakai satu suara. Hasilnya PCM 16-bit mono.
+import { overDailyBudget, reportUsage, usageFrom } from '@/lib/ai-usage';
 import { GoogleGenAI, Modality, type Part } from '@google/genai';
 import { geminiConfig } from '@/lib/agent/model';
 import type { ListeningScript } from './ielts-ai';
@@ -44,6 +45,7 @@ export async function synthesize(s: TtsScript, signal?: AbortSignal): Promise<{ 
   const model = ttsModel();
   if (!cfg) throw new TtsError('Gemini belum diatur.');
   if (!model) throw new TtsError('GEMINI_TTS_MODEL belum diisi di Vercel (mis. gemini-3.8-flash-tts).');
+  if (overDailyBudget()) throw new TtsError('Batas pemakaian Gemini hari ini sudah tercapai. Ubah di Pengaturan, Gemini.');
   const ai = new GoogleGenAI({ apiKey: cfg.apiKey, httpOptions: { timeout: 55_000, ...(cfg.baseUrl ? { baseUrl: cfg.baseUrl } : {}) } });
   const speechConfig = s.speakers.length === 1
     ? { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICES.lecturer } } }
@@ -67,6 +69,7 @@ export async function synthesize(s: TtsScript, signal?: AbortSignal): Promise<{ 
     const status = (e as { status?: number }).status;
     throw new TtsError(status === 429 ? 'Kuota TTS Gemini habis. Coba lagi nanti.' : status && status >= 500 ? 'Server TTS Gemini sedang sibuk. Coba lagi sebentar.' : `TTS Gemini gagal: ${(e as Error).message.slice(0, 200)}`);
   }
+  reportUsage(usageFrom(model, res.usageMetadata));
   const parts = res.candidates?.[0]?.content?.parts ?? [];
   const audio = parts.filter((p) => p.inlineData?.data && p.inlineData.mimeType?.startsWith('audio/'));
   if (!audio.length) throw new TtsError('Gemini tidak mengembalikan audio. Pastikan GEMINI_TTS_MODEL adalah model TTS.');

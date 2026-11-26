@@ -8,7 +8,7 @@ import {
   db, getReadings, getResearchIdeas, getResearchNeeds, getResearchProjects, getResearchTargets, getSupervisions,
 } from '@/lib/data';
 import { formatDayMonth, formatDayShort } from '@/lib/format';
-import { daysUntouched, summarizeProject } from '@/lib/research';
+import { daysUntouched, linkedReadingCounts, summarizeProject } from '@/lib/research';
 import { todayIso } from '@/lib/time';
 
 export const metadata: Metadata = { title: 'Riset' };
@@ -26,6 +26,7 @@ export default async function RisetPage() {
     getResearchProjects(s), getResearchTargets(s), getResearchNeeds(s), getResearchIdeas(s), getReadings(s), getSupervisions(s),
   ]);
   const summary = summarizeProject(projects, targets, supervisions, today);
+  const links = linkedReadingCounts(readings);
   const pid = summary ? `&project_id=${summary.project.id}` : '';
 
   return (
@@ -56,6 +57,7 @@ export default async function RisetPage() {
                     <span className="mt-1 block text-[12px] text-muted">
                       {t.due_date ? `Tenggat ${formatDayMonth(t.due_date)}` : 'Tanpa tenggat'}
                       {idle != null && idle > UNTOUCHED_DAYS && <span className="text-warn-fg"> · {idle} hari tidak disentuh</span>}
+                      {links.targets.get(t.id) ? ` · ${links.targets.get(t.id)} literatur` : ''}
                     </span>
                   </Link>
                 );
@@ -72,7 +74,7 @@ export default async function RisetPage() {
             <div className="card rows overflow-hidden">
               {ideas.map((i) => {
                 const [label, tone] = IDEA[i.status as keyof typeof IDEA] ?? IDEA.raw;
-                return <Link key={i.id} href={`/catat/ide/${i.id}${K}`} className={row}><span><span className="block text-[14px] font-semibold">{i.content}</span>{i.source && <span className="block text-[12px] text-muted">dari {i.source}</span>}</span><Chip tone={tone}>{label}</Chip></Link>;
+                return <Link key={i.id} href={`/catat/ide/${i.id}${K}`} className={row}><span><span className="block text-[14px] font-semibold">{i.content}</span>{(i.source || links.ideas.get(i.id)) && <span className="block text-[12px] text-muted">{[i.source && `dari ${i.source}`, links.ideas.get(i.id) && `${links.ideas.get(i.id)} literatur`].filter(Boolean).join(' · ')}</span>}</span><Chip tone={tone}>{label}</Chip></Link>;
               })}
             </div>
           ) : <div className="card"><EmptyState>Belum ada ide.</EmptyState></div>}

@@ -20,6 +20,10 @@ export async function loadOptions(db: Db, def: EntityDef): Promise<Record<string
       .map((p) => ({ value: p.id as string, label: p.title as string })),
     semesters: async () => ((await db.from('semesters').select('id,name,is_active').order('number')).data ?? [])
       .map((s) => ({ value: s.id as string, label: `${s.name}${s.is_active ? ' (aktif)' : ''}` })),
+    researchTargets: async () => ((await db.from('research_targets').select('id,title,progress').order('due_date', { nullsFirst: false }).order('created_at')).data ?? [])
+      .map((t) => ({ value: t.id as string, label: `${t.title} (${t.progress}%)` })),
+    researchIdeas: async () => ((await db.from('research_ideas').select('id,content').neq('status', 'discarded').order('created_at')).data ?? [])
+      .map((i) => ({ value: i.id as string, label: String(i.content).length > 90 ? `${String(i.content).slice(0, 88)}…` : (i.content as string) })),
   };
   await Promise.all([...sources].map(async (s) => { out[s] = await load[s](); }));
   return out;
