@@ -72,11 +72,12 @@ export function topicByKey(key: string | null | undefined): GrammarTopic | undef
 
 /* ---------------- skill harian ---------------- */
 
-export type Skill = 'reading' | 'writing_task2' | 'speaking_part1' | 'speaking_part2' | 'writing_task1' | 'speaking_part3' | 'report';
+export type Skill = 'reading' | 'writing_task2' | 'listening' | 'speaking_part1' | 'speaking_part2' | 'writing_task1' | 'speaking_part3' | 'report';
 
 export const SKILLS: Record<Skill, { title: string; detail: string; href: string; minutes: number }> = {
   reading: { title: 'Reading', detail: 'Teks akademik pendek dan 6 soal tipe IELTS', href: '/bahasa/ielts/reading', minutes: 8 },
   writing_task2: { title: 'Writing Task 2', detail: 'Esai minimal 250 kata, boleh dicicil', href: '/bahasa/ielts/writing?task=2', minutes: 15 },
+  listening: { title: 'Listening', detail: 'Rekaman 2 sampai 3 menit dan 6 soal, lalu transkrip dan terjemahannya', href: '/bahasa/ielts/listening', minutes: 8 },
   speaking_part1: { title: 'Speaking Part 1', detail: 'Pertanyaan singkat tentang dirimu', href: '/bahasa/ielts/speaking?part=1', minutes: 5 },
   speaking_part2: { title: 'Speaking Part 2', detail: 'Cue card, bicara sampai 2 menit', href: '/bahasa/ielts/speaking?part=2', minutes: 5 },
   writing_task1: { title: 'Writing Task 1', detail: 'Ringkas data tabel, minimal 150 kata', href: '/bahasa/ielts/writing?task=1', minutes: 12 },
@@ -84,8 +85,8 @@ export const SKILLS: Record<Skill, { title: string; detail: string; href: string
   report: { title: 'Laporan mingguan', detail: 'Lihat perkiraan band dan rencana minggu depan', href: '/bahasa#laporan', minutes: 3 },
 };
 
-/** Senin Reading, Selasa Writing Task 2, Rabu Speaking Part 1, Kamis Part 2, Jumat Writing Task 1, Sabtu Part 3, Minggu laporan. */
-const ROTATION: Skill[] = ['reading', 'writing_task2', 'speaking_part1', 'speaking_part2', 'writing_task1', 'speaking_part3', 'report'];
+/** Senin Reading, Selasa Writing Task 2, Rabu Listening, Kamis Speaking Part 2, Jumat Writing Task 1, Sabtu Speaking Part 3, Minggu laporan (D-65). */
+const ROTATION: Skill[] = ['reading', 'writing_task2', 'listening', 'speaking_part2', 'writing_task1', 'speaking_part3', 'report'];
 
 export function skillFor(date: string): Skill {
   return ROTATION[isoWeekday(date) - 1];

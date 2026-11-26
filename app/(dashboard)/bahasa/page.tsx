@@ -87,13 +87,10 @@ export default async function BahasaPage() {
 
       <Section title="Latihan per skill">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <Tile href="/bahasa/ielts/reading" icon={BookOpenText} label="Reading" sub="Teks akademik + 6 soal" />
+          <Tile href="/bahasa/ielts/reading" icon={BookOpenText} label="Reading" sub="Teks akademik + 6 soal, ada terjemahan" />
           <Tile href="/bahasa/ielts/writing?task=2" icon={PenLine} label="Writing" sub="Task 1 tabel, Task 2 esai" />
           <Tile href="/bahasa/ielts/speaking?part=2" icon={Mic} label="Speaking" sub="Part 1, cue card Part 2, Part 3" />
-          <div className="card flex items-center gap-3 border-dashed p-3" aria-disabled="true">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-bg text-muted"><Headphones size={20} strokeWidth={1.8} aria-hidden="true" /></span>
-            <span><span className="block text-[14px] font-semibold">Listening</span><span className="block text-[12px] text-muted">Segera, memakai suara dari Gemini</span></span>
-          </div>
+          <Tile href="/bahasa/ielts/listening" icon={Headphones} label="Listening" sub="Rekaman + soal, lalu transkrip dan terjemahan" />
         </div>
       </Section>
 

@@ -32,7 +32,7 @@ export function BandCard({ s, target, daysLeft, testDate }: { s: BandSummary; ta
         </div>
       </div>
       <Bar label="Reading" band={s.reading} target={target} />
-      <Bar label="Listening" band={s.listening} target={target} note="segera" />
+      <Bar label="Listening" band={s.listening} target={target} />
       <Bar label="Writing" band={s.writing} target={target} />
       <Bar label="Speaking" band={s.speaking} target={target} />
       <p className="text-[12px] text-muted">

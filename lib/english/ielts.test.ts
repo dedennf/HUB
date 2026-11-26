@@ -63,6 +63,7 @@ describe('rotasi skill', () => {
   it('Senin Reading sampai Minggu laporan', () => {
     expect(skillFor('2026-11-23')).toBe('reading');
     expect(skillFor('2026-11-24')).toBe('writing_task2');
+    expect(skillFor('2026-11-25')).toBe('listening');
     expect(skillFor('2026-11-27')).toBe('writing_task1');
     expect(skillFor('2026-11-29')).toBe('report');
   });

@@ -204,6 +204,7 @@ export function assessSpeaking(model: AgentModel, p: EnglishProfile & { targetBa
 export const readingSchema = z.object({
   title: z.string(),
   passage: z.string().min(200),
+  translation_paragraphs: z.array(z.string()).optional().default([]),
   questions: z.array(z.object({
     type: z.enum(['tfng', 'mcq']), prompt: z.string(), options: z.array(z.string()).min(2).max(4), answer: z.string(), explanation_id: z.string(),
   })).min(4).max(8),
@@ -217,14 +218,53 @@ export function readingSet(model: AgentModel, p: EnglishProfile, signal?: AbortS
     'questions: tepat 6 soal. 3 bertipe tfng dengan options persis ["TRUE", "FALSE", "NOT GIVEN"], dan 3 bertipe mcq dengan 4 pilihan.',
     'Soal TRUE/FALSE/NOT GIVEN harus bisa dibuktikan dari teks, NOT GIVEN berarti teks tidak menyebutnya. answer persis sama dengan salah satu options.',
     'explanation_id: bahasa Indonesia, kutip bagian teks yang jadi bukti.',
+    'translation_paragraphs: terjemahan bahasa Indonesia yang natural untuk tiap paragraf passage, berurutan dan jumlahnya sama dengan paragraf.',
   ].join('\n');
   const json = {
     type: 'object',
     properties: {
-      title: str(), passage: str(),
+      title: str(), passage: str(), translation_paragraphs: arr(str()),
       questions: arr({ type: 'object', properties: { type: { type: 'string', enum: ['tfng', 'mcq'] }, prompt: str(), options: arr(str()), answer: str(), explanation_id: str() }, required: ['type', 'prompt', 'options', 'answer', 'explanation_id'] }),
     },
     required: ['title', 'passage', 'questions'],
   };
   return ask(model, system, 'Topik acak.', json, readingSchema, signal);
+}
+
+/* ---------------- Listening (D-65) ---------------- */
+
+export const listeningSchema = z.object({
+  title: z.string(),
+  speakers: z.array(z.object({ name: z.string().min(1).max(20), gender: z.enum(['female', 'male']) })).min(1).max(2),
+  lines: z.array(z.object({ speaker: z.string(), text: z.string().min(1), translation_id: z.string() })).min(4).max(40),
+  questions: z.array(z.object({
+    type: z.enum(['gap', 'mcq']), prompt: z.string(), options: z.array(z.string()).optional().default([]),
+    answer: z.string().min(1), accept: z.array(z.string()).optional().default([]), explanation_id: z.string(),
+  })).min(4).max(8),
+}).refine((s) => s.questions.every((q) => q.type === 'gap' || q.options.includes(q.answer)), { message: 'Jawaban pilihan ganda harus salah satu pilihan.' })
+  .refine((s) => s.lines.every((l) => s.speakers.some((sp) => sp.name === l.speaker)), { message: 'Setiap baris harus milik pembicara yang terdaftar.' });
+export type ListeningScript = z.infer<typeof listeningSchema>;
+
+export function listeningScript(model: AgentModel, p: EnglishProfile, section: 1 | 4, signal?: AbortSignal) {
+  const spec = section === 1
+    ? 'Section 1: percakapan dua orang tentang urusan sehari-hari (memesan, mendaftar, bertanya informasi). speakers dua orang, satu female dan satu male, nama Inggris pendek. 14 sampai 22 baris, total 300 sampai 380 kata. Sisipkan detail yang lazim ditanyakan: nama dieja, angka, tanggal, harga, alamat.'
+    : 'Section 4: ceramah akademik satu pembicara (dosen) tentang topik ilmiah populer. speakers satu orang. Bagi jadi 8 sampai 14 baris (tiap baris satu sampai tiga kalimat), total 330 sampai 400 kata.';
+  const system = [
+    'Buat latihan IELTS Listening versi pendek. Naskah akan dibacakan mesin suara, jadi tulis seperti ucapan alami.', describe(p), spec,
+    'Setiap baris: speaker (nama persis seperti di speakers), text bahasa Inggris, translation_id terjemahan bahasa Indonesia yang natural dan mudah dipahami.',
+    'questions: tepat 6 soal berurutan sesuai alur rekaman. 3 bertipe gap (isian, jawaban maksimal tiga kata atau satu angka, prompt memakai ____), 3 bertipe mcq dengan 3 pilihan.',
+    'Untuk gap: answer persis seperti diucapkan, accept berisi variasi yang juga benar (mis. "15" dan "fifteen", "Tuesday" dan "Tue"). Untuk mcq: answer persis sama dengan salah satu options, kosongkan accept.',
+    'Jawaban harus terdengar jelas di naskah. Sertakan pengecoh yang wajar (mis. pembicara meralat angka). explanation_id: bahasa Indonesia, kutip kalimat naskah yang menjadi bukti.',
+  ].join('\n');
+  const json = {
+    type: 'object',
+    properties: {
+      title: str(),
+      speakers: arr({ type: 'object', properties: { name: str(), gender: { type: 'string', enum: ['female', 'male'] } }, required: ['name', 'gender'] }),
+      lines: arr({ type: 'object', properties: { speaker: str(), text: str(), translation_id: str() }, required: ['speaker', 'text', 'translation_id'] }),
+      questions: arr({ type: 'object', properties: { type: { type: 'string', enum: ['gap', 'mcq'] }, prompt: str(), options: arr(str()), answer: str(), accept: arr(str()), explanation_id: str() }, required: ['type', 'prompt', 'answer', 'explanation_id'] }),
+    },
+    required: ['title', 'speakers', 'lines', 'questions'],
+  };
+  return ask(model, system, 'Topik acak yang umum di IELTS.', json, listeningSchema, signal);
 }

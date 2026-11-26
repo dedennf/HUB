@@ -3,6 +3,7 @@ import { isOwnerEmail } from '@/lib/env';
 import { resolveSessionUser } from '@/lib/auth';
 import { availableModels, diagnose, toneWav } from '@/lib/agent/diagnose';
 import { transcribeWithLive, wavToPcm16k } from '@/lib/live/transcribe';
+import { synthesize, ttsModel } from '@/lib/english/tts';
 import { geminiConfig } from '@/lib/agent/model';
 import { diagnoseLive } from '@/lib/live/diagnose';
 import { liveConfig, liveModel } from '@/lib/live/config';
@@ -32,6 +33,17 @@ export async function GET() {
       report.cases.push({ model: live, test: 'transkripsi pesan suara (Live)', ok: true, ms: Date.now() - t0, reply: t ? `"${t.slice(0, 80)}"` : '(tidak ada ucapan, sesuai harapan)' });
     } catch (e) {
       report.cases.push({ model: live, test: 'transkripsi pesan suara (Live)', ok: false, ms: Date.now() - t0, reason: 'galat', detail: (e as Error).message.slice(0, 300) });
+    }
+  }
+  // D-65: suara IELTS Listening
+  const tts = ttsModel();
+  if (tts) {
+    const t0 = Date.now();
+    try {
+      const { pcm, rate } = await synthesize({ speakers: [{ name: 'Tom', gender: 'male' }, { name: 'Anna', gender: 'female' }], lines: [{ speaker: 'Tom', text: 'Hello.' }, { speaker: 'Anna', text: 'Hi there.' }] }, AbortSignal.timeout(30_000));
+      report.cases.push({ model: tts, test: 'suara Listening (TTS dua pembicara)', ok: true, ms: Date.now() - t0, reply: `${(pcm.length / 2 / rate).toFixed(1)} detik audio` });
+    } catch (e) {
+      report.cases.push({ model: tts, test: 'suara Listening (TTS dua pembicara)', ok: false, ms: Date.now() - t0, reason: 'galat', detail: (e as Error).message.slice(0, 300) });
     }
   }
   console.log('[agent] diagnosa Gemini:', JSON.stringify(report));
