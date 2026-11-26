@@ -38,6 +38,22 @@ export function AccountForm({ account }: { account?: Account }) {
         <span className="label">Nama lain (pisahkan dengan koma)</span>
         <input name="aliases" className="input" defaultValue={account?.aliases.join(', ')} placeholder="atm biru, rekening utama" />
       </label>
+      <label>
+        <span className="label">Nomor rekening atau nomor HP e-wallet</span>
+        <input name="account_number" className="input num" inputMode="numeric" maxLength={40} defaultValue={account?.account_number ?? ''} placeholder="1234567890" />
+        <span className="mt-1 block text-[12px] text-muted">Opsional. Muncul dengan tombol Salin saat ada yang minta nomor rekening.</span>
+        {err('account_number')}
+      </label>
+      <label>
+        <span className="label">Atas nama</span>
+        <input name="account_holder" className="input" maxLength={80} defaultValue={account?.account_holder ?? ''} placeholder="Nama di rekening" />
+      </label>
+      <label className="sm:col-span-2">
+        <span className="label">Situs untuk logo (opsional)</span>
+        <input name="logo_domain" className="input" maxLength={80} defaultValue={account?.logo_domain ?? ''} placeholder="Kosongkan, logo BCA, GoPay, dll. dikenali otomatis" />
+        <span className="mt-1 block text-[12px] text-muted">Isi bila logo tidak muncul, mis. bankraya.co.id.</span>
+        {err('logo_domain')}
+      </label>
       {account && (
         <label className="flex min-h-11 items-center gap-2 text-[14px] sm:col-span-2">
           <input type="checkbox" name="is_archived" defaultChecked={account.is_archived} className="h-5 w-5 accent-[var(--accent)]" /> Arsipkan (sembunyikan dari pilihan)

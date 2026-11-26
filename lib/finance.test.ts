@@ -5,7 +5,7 @@ import {
 import type { Account, Category, Debt, Investment } from './types';
 
 const acc = (id: string, type: Account['type'], balance: number, is_archived = false): Account =>
-  ({ id, name: id, type, opening_balance: 0, balance, aliases: [], is_archived, sort_order: 0 });
+  ({ id, name: id, type, opening_balance: 0, balance, aliases: [], is_archived, sort_order: 0, account_number: null, account_holder: null, logo_domain: null });
 const accounts = [acc('bank', 'bank', 1_000_000), acc('wallet', 'ewallet', 200_000), acc('rd', 'investment', 500_000), acc('old', 'cash', 99, true)];
 const tx = (kind: TxLite['kind'], amount: number, account_id: string, date: string, to: string | null = null, category_id: string | null = null): TxLite =>
   ({ kind, amount, account_id, to_account_id: to, category_id, occurred_at: `${date}T05:00:00.000Z` });
@@ -55,5 +55,21 @@ describe('finance', () => {
     expect(lines[0]).toMatchObject({ spent: 620_000, budget: 800_000, perDayLeft: 20_000 });
     expect(lines[0].ratio).toBeCloseTo(0.775);
     expect(daysLeftInMonth('2026-11-22')).toBe(9);
+  });
+});
+
+describe('aman dibelanjakan hari ini', async () => {
+  const { safeToSpend } = await import('./finance');
+  const cat = (id: string, monthly_budget: number | null) => ({ id, slug: null, name: id, kind: 'expense' as const, icon: null, color: null, monthly_budget, keywords: [], subcategories: [], sort_order: 0, is_hidden: false });
+  const t = (amount: number, category_id: string, date: string) => ({ kind: 'expense' as const, amount, account_id: 'a', to_account_id: null, category_id, occurred_at: `${date}T05:00:00Z` });
+  const dateOf = (x: { occurred_at: string }) => x.occurred_at.slice(0, 10);
+  it('sisa budget dibagi sisa hari, dikurangi belanja hari ini', () => {
+    // 30 November: sisa 1 hari termasuk hari ini
+    const r = safeToSpend([cat('makan', 1_500_000), cat('lain', null)], [t(1_000_000, 'makan', '2026-11-10'), t(50_000, 'makan', '2026-11-30'), t(999, 'lain', '2026-11-30')], '2026-11-30', dateOf);
+    expect(r).toEqual({ perDay: 500_000, spentToday: 50_000, leftToday: 450_000, remaining: 450_000, budget: 1_500_000 });
+  });
+  it('tanpa budget: null, budget terlampaui: 0 per hari', () => {
+    expect(safeToSpend([cat('lain', null)], [], '2026-11-15', dateOf)).toBeNull();
+    expect(safeToSpend([cat('makan', 100)], [t(500, 'makan', '2026-11-01')], '2026-11-15', dateOf)!.perDay).toBe(0);
   });
 });

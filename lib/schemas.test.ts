@@ -22,4 +22,13 @@ describe('schemas', () => {
       .toEqual({ name: 'BCA', type: 'bank', opening_balance: 1500000, aliases: ['atm biru', 'biru'], is_archived: false });
     expect(accountInput.parse({ name: 'Kartu', type: 'bank', opening_balance: '-50rb', aliases: '' }).opening_balance).toBe(-50000);
   });
+  it('akun: nomor rekening, atas nama, domain logo', () => {
+    const base = { name: 'BCA', type: 'bank', opening_balance: '', aliases: '' };
+    expect(accountInput.parse({ ...base, account_number: ' 123 456-7890 ', account_holder: ' Deden ', logo_domain: 'https://www.BCA.co.id/id' }))
+      .toMatchObject({ account_number: '123 456-7890', account_holder: 'Deden', logo_domain: 'bca.co.id' });
+    expect(accountInput.parse({ ...base, account_number: '', account_holder: '', logo_domain: '' }))
+      .toMatchObject({ account_number: null, account_holder: null, logo_domain: null });
+    expect(accountInput.safeParse({ ...base, account_number: '12ab' }).success).toBe(false);
+    expect(accountInput.safeParse({ ...base, logo_domain: 'bukan domain' }).success).toBe(false);
+  });
 });

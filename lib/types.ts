@@ -3,6 +3,7 @@
 export type Account = {
   id: string; name: string; type: 'bank' | 'ewallet' | 'cash' | 'investment';
   opening_balance: number; balance: number; aliases: string[]; is_archived: boolean; sort_order: number;
+  account_number: string | null; account_holder: string | null; logo_domain: string | null;
 };
 export type Category = {
   id: string; slug: string | null; name: string; kind: 'expense' | 'income'; icon: string | null; color: string | null;

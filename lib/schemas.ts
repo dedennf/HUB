@@ -39,6 +39,11 @@ export const accountInput = z.object({
   ),
   aliases: z.preprocess((v) => String(v ?? '').split(',').map((s) => s.trim()).filter(Boolean), z.array(z.string().max(60)).max(20)),
   is_archived: z.preprocess((v) => v === 'on' || v === 'true' || v === true, z.boolean()),
+  account_number: z.preprocess((v) => String(v ?? '').trim() || null,
+    z.string().max(40).regex(/^[0-9+\s.-]+$/, 'Nomor hanya boleh angka, spasi, atau tanda hubung.').nullable()).optional(),
+  account_holder: z.preprocess((v) => String(v ?? '').trim() || null, z.string().max(80).nullable()).optional(),
+  logo_domain: z.preprocess((v) => String(v ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '') || null,
+    z.string().regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/, 'Isi domain situs, mis. bca.co.id').nullable()).optional(),
 });
 export type AccountInput = z.infer<typeof accountInput>;
 

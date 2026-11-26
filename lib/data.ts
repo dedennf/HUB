@@ -16,7 +16,7 @@ export async function db(): Promise<Db> {
 }
 
 export const getAccounts = (s: Db) =>
-  rows<T.Account>(s.from('accounts').select('id,name,type,opening_balance,balance,aliases,is_archived,sort_order').order('sort_order').order('name'));
+  rows<T.Account>(s.from('accounts').select('id,name,type,opening_balance,balance,aliases,is_archived,sort_order,account_number,account_holder,logo_domain').order('sort_order').order('name'));
 
 export const getCategories = (s: Db) =>
   rows<T.Category>(s.from('categories').select('id,slug,name,kind,icon,color,monthly_budget,keywords,subcategories,sort_order,is_hidden').order('kind').order('sort_order'));
