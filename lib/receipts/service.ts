@@ -1,7 +1,7 @@
 // Alur unggah struk (SPEC 7.2): tolak duplikat → simpan ke bucket privat → Gemini membaca → usulan aksi.
 // Data baru berubah setelah pengguna menyetujui kartu, sama seperti input teks (SPEC 6.3).
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ensureConversation, insertMessages } from '@/lib/agent/core';
+import { ensureConversation, insertMessages, runAgent } from '@/lib/agent/core';
 import { ModelError, type AgentModel } from '@/lib/agent/model';
 import { loadCards, loadLookups } from '@/lib/agent/service';
 import type { CardView, Lookups } from '@/lib/agent/cards';
@@ -21,7 +21,9 @@ export type ReceiptCard = CardView & { receipt_url?: string; receipt_mime?: stri
 export type ReceiptResult =
   | { status: 'proposed'; conversation_id: string; receipt_id: string; reply: string; proposed_actions: ReceiptCard[]; lookups: Lookups }
   | { status: 'duplicate'; message: string; transaction?: { id: string; label: string; href: string } }
-  | { status: 'unreadable' | 'offline'; message: string; receipt_id?: string };
+  | { status: 'unreadable' | 'offline'; message: string; receipt_id?: string }
+  /** Gambar bukan struk (atau dikirim dengan pesan): dibaca Ra lewat loop agen dengan semua tool (D-72). */
+  | { status: 'agent'; conversation_id: string; reply: string; proposed_actions: CardView[]; lookups: Lookups };
 
 export async function overReceiptLimit(ctx: ToolCtx): Promise<boolean> {
   const since = new Date(ctx.now.getTime() - 60_000).toISOString();
@@ -55,13 +57,36 @@ const OFFLINE: Record<ModelError['reason'], string> = {
   not_configured: 'Gemini belum diatur', quota: 'kuota Gemini habis', budget: 'batas harian Gemini di Kompas tercapai', timeout: 'Gemini terlalu lama menjawab', rejected: 'permintaan ditolak Gemini', unavailable: 'Gemini tidak bisa dihubungi',
 };
 
+/** Teruskan gambar ke loop Ra. Gambar tidak disimpan: hanya penanda teks yang masuk riwayat. */
+async function imageToAgent(ctx: ToolCtx, model: AgentModel, input: { data: Buffer; mime: string; note?: string; conversationId: string | null; budgetMs?: number }): Promise<ReceiptResult> {
+  try {
+    const r = await runAgent({
+      ctx, model, text: input.note ?? '', conversationId: input.conversationId, channel: 'receipt',
+      image: { data: input.data, mime: input.mime }, signal: AbortSignal.timeout(input.budgetMs ?? 40_000),
+    });
+    const lookups = await loadLookups(ctx.db);
+    const cards = r.action_ids.length ? await loadCards(ctx.db, r.action_ids, lookups, ctx.today) : [];
+    return { status: 'agent', conversation_id: r.conversation_id, reply: r.reply, proposed_actions: cards, lookups };
+  } catch (e) {
+    if (e instanceof ModelError) {
+      console.error('[image] Gemini gagal membaca gambar:', e.reason, '|', e.detail);
+      return { status: 'offline', message: `Ra tidak bisa membaca gambar sekarang (${OFFLINE[e.reason]}). Coba lagi nanti atau ketik isinya.` };
+    }
+    throw e;
+  }
+}
+
 export async function handleReceiptUpload(ctx: ToolCtx, model: AgentModel | null, input: {
   userId: string; data: Buffer; mime: string; hash: string; fileName?: string; conversationId: string | null; budgetMs?: number;
+  /** Pesan yang diketik bersama gambar. Bila ada, gambar langsung dibaca Ra, bukan sebagai struk (D-72). */
+  note?: string;
 }): Promise<ReceiptResult> {
   const db = ctx.db;
+  const started = Date.now();
+  if (!model) return { status: 'offline', message: 'Ra belum tersambung ke Gemini (belum diatur), jadi gambar belum bisa dibaca. Catat manual dulu.' };
+  if (input.note?.trim()) return imageToAgent(ctx, model, { ...input, note: input.note.trim() });
   const dup = await findDuplicate(db, input.hash);
   if (dup) return dup;
-  if (!model) return { status: 'offline', message: 'Ra belum tersambung ke Gemini (belum diatur), jadi struk belum bisa dibaca. Catat manual dulu.' };
 
   const path = `${input.userId}/${input.hash}.${EXT[input.mime] ?? 'bin'}`;
   const up = await db.storage.from(RECEIPT_BUCKET).upload(path, input.data, { contentType: input.mime, upsert: true });
@@ -90,6 +115,12 @@ export async function handleReceiptUpload(ctx: ToolCtx, model: AgentModel | null
     }
     console.error('[receipt] hasil baca tidak valid:', e);
     return { status: 'unreadable', message: 'Ra tidak bisa memahami isi struk ini. Foto ulang lebih jelas atau catat manual.' };
+  }
+  if (extraction.doc_type === 'other') {
+    // bukan dokumen keuangan: tidak disimpan sebagai struk, biarkan Ra yang membaca (D-72)
+    await cleanup(db, row.id, path);
+    // sisa waktu dari batas fungsi Vercel 60 detik, setelah ekstraksi pertama
+    return imageToAgent(ctx, model, { ...input, budgetMs: Math.max(15_000, 52_000 - (Date.now() - started)) });
   }
   await db.from('receipts').update({ extracted: extraction }).eq('id', row.id);
 

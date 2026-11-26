@@ -54,8 +54,9 @@ export async function prepareReceipt(file: File): Promise<PreparedReceipt> {
   return { blob, mime, hash, name: file.name || 'struk', preview: pdf || mime === 'image/heic' ? null : URL.createObjectURL(blob) };
 }
 
-export async function uploadReceipt(r: PreparedReceipt, conversationId: string | null): Promise<ReceiptResult> {
+export async function uploadReceipt(r: PreparedReceipt, conversationId: string | null, note?: string): Promise<ReceiptResult> {
   const fd = new FormData();
+  if (note?.trim()) fd.set('note', note.trim());
   fd.set('file', new File([r.blob], r.name.replace(/\.(heic|heif|png|webp)$/i, r.mime === 'image/jpeg' ? '.jpg' : '.$1'), { type: r.mime }));
   fd.set('hash', r.hash);
   if (conversationId) fd.set('conversation_id', conversationId);

@@ -26,6 +26,7 @@ export async function POST(req: Request) {
   const file = form.get('file');
   const hash = String(form.get('hash') ?? '').toLowerCase();
   const conv = String(form.get('conversation_id') ?? '');
+  const note = String(form.get('note') ?? '').trim().slice(0, 2000);
   if (!(file instanceof File) || file.size === 0) return NextResponse.json({ error: 'Berkas struk kosong.' }, { status: 400 });
   if (!RECEIPT_MIME.includes(file.type as (typeof RECEIPT_MIME)[number])) return NextResponse.json({ error: 'Jenis berkas tidak didukung. Pakai foto (JPG, PNG, WebP, HEIC) atau PDF.' }, { status: 415 });
   if (file.size > MAX_RECEIPT_BYTES) return NextResponse.json({ error: 'Berkas terlalu besar (maks 4 MB). Untuk PDF, kirim halaman struk yang perlu saja.' }, { status: 413 });
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
     const data = Buffer.from(await file.arrayBuffer());
     const res = await withUsage(ctx.db, 'receipt', () => handleReceiptUpload(ctx, defaultModel(), {
       userId: user.id, data, mime: file.type, hash,
-      fileName: file.name?.slice(0, 80), conversationId: UUID.test(conv) ? conv : null,
+      fileName: file.name?.slice(0, 80), conversationId: UUID.test(conv) ? conv : null, note: note || undefined,
     }));
     return NextResponse.json(res, { status: res.status === 'duplicate' ? 409 : 200 });
   } catch (e) {

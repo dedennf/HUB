@@ -54,3 +54,10 @@ describe('itemsNote dan fitSize', () => {
     expect(fitSize(800, 600)).toEqual({ w: 800, h: 600 });
   });
 });
+
+describe('gambar bukan struk (D-72)', () => {
+  it('doc_type other diterima dan prompt menjelaskannya', () => {
+    expect(parseExtraction('{"doc_type":"other","total":null,"confidence":1}').doc_type).toBe('other');
+    expect(buildPrompt([], [])).toMatch(/BUKAN dokumen keuangan[\s\S]*"other"/);
+  });
+});

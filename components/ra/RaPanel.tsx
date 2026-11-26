@@ -62,10 +62,10 @@ function ReceiptDropZone() {
         addReceipts([...e.dataTransfer.files]);
       }}
       className={`mt-3 rounded-2xl border border-dashed px-4 py-3 text-center text-muted transition-colors ${over ? 'border-accent bg-accent-soft' : 'border-line hover:border-accent'}`}
-      aria-label="Unggah struk: seret berkas ke sini, klik untuk memilih, atau tempel screenshot dengan Ctrl+V"
+      aria-label="Kirim gambar ke Ra: seret berkas ke sini, klik untuk memilih, atau tempel screenshot dengan Ctrl+V"
     >
       <ReceiptText size={20} strokeWidth={1.8} className="mx-auto mb-1" aria-hidden="true" />
-      <span className="block text-[12px]"><span className="font-semibold text-fg">Seret struk ke sini</span> atau tempel screenshot (Ctrl+V). Foto, PDF, bisa beberapa sekaligus.</span>
+      <span className="block text-[12px]"><span className="font-semibold text-fg">Seret struk atau screenshot tugas ke sini</span>, atau tempel (Ctrl+V). Ketik pesan dulu bila perlu, mis. &quot;tugas Fotogrametri&quot;.</span>
     </button>
   );
 }

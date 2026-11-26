@@ -57,6 +57,8 @@ export function buildSystemPrompt(d: ContextData): string {
     '- Jangan mengarang angka. Selalu panggil tool baca sebelum menjawab pertanyaan tentang data.',
     '- Tenggat tanpa jam = 23:59. "Jam 12 malam" = 23:59 hari itu.',
     '- Setelah memanggil tool, tutup dengan satu kalimat pendek. Jangan ulangi isi kartu.',
+    '- Pesan berawalan [gambar] membawa gambar (screenshot web kampus/LMS, jadwal, pengumuman, catatan). Baca isinya lalu panggil tool yang sesuai: add_task untuk tugas/ujian/kuis dengan tenggat, add_event untuk acara, add_material untuk materi, add_research_target/add_research_idea untuk riset, add_transaction untuk pengeluaran. Satu gambar boleh berisi beberapa tugas: usulkan semuanya.',
+    '- Dari gambar: cocokkan nama mata kuliah dengan daftar MATA KULIAH (nama di LMS bisa berbeda, mis. kode atau nama panjang). Jangan mengarang tanggal atau jam yang tidak terlihat. Bila tahun tidak tertulis, pakai tanggal terdekat ke depan. Tulis deskripsi singkat dari isi gambar.',
     '- Pesan berawalan [pesan suara] adalah transkrip otomatis. Pahami salah dengar dari konteks (mis. "go pay" = GoPay, "tiga puluh ribu" = 30000).',
     d.englishMode
       ? '- English Mode aktif: pengguna boleh menulis dalam bahasa Inggris. Tetap jalankan permintaannya.'

@@ -87,6 +87,10 @@ export function RaProvider({ children, englishMode: initialEnglish = false }: { 
   const addReceipts = useCallback(async (files: File[]) => {
     const list = files.slice(0, 10);
     if (!list.length) return;
+    // pesan yang sedang diketik di kolom Ra ikut dikirim bersama gambar (D-72), lalu kolomnya dikosongkan
+    const box = [...document.querySelectorAll<HTMLInputElement>('input[name="ra-text"]')].find((i) => i.value.trim());
+    const note = box?.value.trim() ?? '';
+    if (box) { box.value = ''; box.dispatchEvent(new Event('input', { bubbles: true })); }
     openRa();
     const uid = () => Math.random().toString(36).slice(2);
     const prepared: PreparedReceipt[] = [];
@@ -101,22 +105,32 @@ export function RaProvider({ children, englishMode: initialEnglish = false }: { 
       return m;
     });
     setMessages((m) => [...m.map((x) => (x.from === 'ra' && x.status === 'pending' ? { ...x, status: 'cancelled' as const } : x)),
-      { id: uid(), from: 'user', text: list.length > 1 ? `${list.length} struk` : 'Struk', images: prepared.map((p) => p.preview) }]);
+      { id: uid(), from: 'user', text: note || (list.length > 1 ? `${list.length} gambar` : 'Gambar'), images: prepared.map((p) => p.preview) }]);
     const cards: CardView[] = [];
     const lines: string[] = [...problems];
     const links: RaLink[] = [];
     let lookups: Lookups | undefined;
     let offline: string | null = null;
+    let receipts = 0;
+    const replies: string[] = [];
     for (let i = 0; i < prepared.length; i++) {
       setScanning({ preview: prepared[i].preview, done: i, total: prepared.length });
       let r: ReceiptResult;
       try {
-        r = await uploadReceipt(prepared[i], convRef.current);
+        r = await uploadReceipt(prepared[i], convRef.current, note);
       } catch (e) {
         lines.push(`${prepared[i].name}: ${e instanceof ApiFailure ? e.message : 'gagal diunggah.'}`);
         continue;
       }
-      if (r.status === 'proposed') {
+      if (r.status === 'agent') {
+        // bukan struk: Ra membaca gambar dengan semua tool (tugas, acara, materi, riset)
+        cards.push(...r.proposed_actions);
+        if (r.reply) replies.push(prepared.length > 1 ? `${prepared[i].name}: ${r.reply}` : r.reply);
+        lookups = r.lookups;
+        convRef.current = r.conversation_id;
+        setConversationId(r.conversation_id);
+      } else if (r.status === 'proposed') {
+        receipts++;
         cards.push(...r.proposed_actions);
         lookups = r.lookups;
         convRef.current = r.conversation_id;
@@ -128,9 +142,9 @@ export function RaProvider({ children, englishMode: initialEnglish = false }: { 
       }
     }
     setScanning(null);
-    const text = cards.length
-      ? `${cards.length > 1 ? `${cards.length} struk terbaca` : 'Struk terbaca'}. Cek dulu sebelum disimpan.`
-      : offline ? 'Struk belum bisa dibaca.' : 'Tidak ada struk yang bisa dicatat.';
+    const head = receipts ? `${receipts > 1 ? `${receipts} struk terbaca` : 'Struk terbaca'}. Cek dulu sebelum disimpan.` : '';
+    const text = [head, ...replies].filter(Boolean).join('\n')
+      || (offline ? 'Gambar belum bisa dibaca.' : 'Tidak ada yang bisa dicatat dari gambar ini.');
     setMessages((m) => [...m, {
       id: uid(), from: 'ra', text, lines: lines.length ? lines : undefined, links: links.length ? links : undefined,
       actions: cards.length ? cards : undefined, lookups, edits: {}, status: cards.length ? 'pending' : undefined,

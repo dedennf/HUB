@@ -91,7 +91,7 @@ export function RaChat({ inputRef, showCamera = true }: { inputRef?: RefObject<H
           <div className="flex flex-col items-center gap-3 px-2 py-6 text-center">
             <RaAvatar size={44} />
             <p className="font-display text-[16px] font-bold">Catat apa hari ini?</p>
-            <p className="max-w-72 text-[13px] text-muted">Tulis atau bicara seperti chat biasa, atau kirim foto struk. Tahan tombol mic untuk bicara. Tidak ada yang tersimpan sebelum kamu setujui.</p>
+            <p className="max-w-72 text-[13px] text-muted">Tulis atau bicara seperti chat biasa, atau kirim gambar: struk, screenshot tugas dari web kampus, jadwal, pengumuman. Tahan tombol mic untuk bicara. Tidak ada yang tersimpan sebelum kamu setujui.</p>
             <div className="flex flex-wrap justify-center gap-2">
               {EXAMPLES.map((e) => (
                 <button key={e} type="button" onClick={() => send(e)} className="min-h-11 rounded-xl border border-line bg-surface px-3 text-[12px] text-fg hover:border-accent">{e}</button>
