@@ -730,3 +730,12 @@ Batas harian: pengaturan `ai_daily_token_limit` (0 = tanpa batas) di Pengaturan,
 Percakapan Live tersambung langsung dari browser ke Gemini dengan token sementara (D-56), jadi tokennya tidak terlihat oleh server dan tidak ikut terhitung. Halaman pemakaian menyebutkan hal ini.
 
 `ai_usage` tidak ikut ekspor cadangan karena hanya log.
+
+## D-69 · Cadangan otomatis mingguan
+**Status: Diputuskan**
+
+ROADMAP Fase 9, untuk mencegah kehilangan data seperti D-01. Otomasi bawaan ke-13 `backup` (aturan, Minggu 02.30 WIB) menulis cadangan JSON yang sama dengan unduhan manual ke bucket privat `backups` (migrasi 0021), path `<user_id>/kompas-YYYY-MM-DD.json`. Hanya 8 cadangan terbaru yang disimpan, yang lebih lama dihapus. Pembuatan isi cadangan dipindah ke `lib/backup.ts` dan dipakai bersama `/api/ekspor/json`.
+
+Otomasi ini ditandai `auto_write` karena berjalan tanpa konfirmasi. Ia tidak mengubah data pengguna, hanya menulis salinan ke penyimpanan. Notifikasi hanya dikirim bila gagal. Daftar cadangan beserta tautan unduh (signed URL 10 menit) tampil di Pengaturan, Cadangan & impor.
+
+Batas berkas bucket 50 MB. Cadangan Kompas saat ini jauh di bawah itu karena struk dan audio tidak ikut.

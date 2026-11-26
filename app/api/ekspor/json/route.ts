@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isOwnerEmail } from '@/lib/env';
-import { EXPORT_TABLES, stripUser } from '@/lib/export';
+import { buildBackup } from '@/lib/backup';
 import { createClient } from '@/lib/supabase/server';
 import { todayIso } from '@/lib/time';
 
@@ -9,13 +9,12 @@ export async function GET() {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user || !isOwnerEmail(auth.user.email)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  const data: Record<string, unknown[]> = {};
-  for (const t of EXPORT_TABLES) {
-    const { data: rows, error } = await supabase.from(t).select('*').order('created_at');
-    if (error) return NextResponse.json({ error: `Gagal membaca ${t}` }, { status: 500 });
-    data[t] = stripUser(rows ?? []);
+  let body: string;
+  try {
+    body = JSON.stringify(await buildBackup(supabase), null, 1);
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
-  const body = JSON.stringify({ app: 'kompas', version: 1, exported: new Date().toISOString(), data }, null, 1);
   return new NextResponse(body, {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
