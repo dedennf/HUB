@@ -35,11 +35,11 @@ export function RaInputBar({ inputRef, onSubmit, busy = false, showCamera = true
       setHasText(false);
     }}>
       {showCamera && (
-        <button type="button" className={iconBtn} aria-label={onPick ? 'Foto struk dengan kamera' : 'Foto struk dengan kamera (segera hadir)'} disabled={!onPick || picking} onClick={() => onPick?.('camera')}>
+        <button type="button" className={iconBtn} aria-label={onPick ? 'Foto struk atau tugas dengan kamera' : 'Foto dengan kamera (segera hadir)'} disabled={!onPick || picking} onClick={() => onPick?.('camera')}>
           <Camera size={20} strokeWidth={1.8} aria-hidden="true" />
         </button>
       )}
-      <button type="button" className={iconBtn} aria-label={onPick ? 'Pilih struk dari galeri atau berkas (bisa beberapa, PDF juga)' : 'Pilih struk dari galeri (segera hadir)'} disabled={!onPick || picking} onClick={() => onPick?.('gallery')}>
+      <button type="button" className={iconBtn} aria-label={onPick ? 'Kirim gambar ke Ra: struk, screenshot tugas, jadwal (bisa beberapa, PDF juga)' : 'Pilih gambar dari galeri (segera hadir)'} disabled={!onPick || picking} onClick={() => onPick?.('gallery')}>
         <ImageIcon size={20} strokeWidth={1.8} aria-hidden="true" />
       </button>
       <label className="min-w-0 flex-1">

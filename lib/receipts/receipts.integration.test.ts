@@ -26,6 +26,24 @@ class FakeVision implements AgentModel {
     return { content: { role: 'model', parts: [{ text }] }, functionCalls: [], text };
   }
 }
+/** Model tiruan D-72: ekstraksi menjawab "other", lalu loop Ra memanggil add_task, lalu menutup dengan teks. */
+class FakeTaskReader implements AgentModel {
+  readonly name = 'fake-task-reader';
+  requests: ModelRequest[] = [];
+  async generate(req: ModelRequest) {
+    this.requests.push(req);
+    if (req.json) {
+      const text = JSON.stringify({ doc_type: 'other', total: null, confidence: 1 });
+      return { content: { role: 'model' as const, parts: [{ text }] }, functionCalls: [], text };
+    }
+    const answered = req.contents.some((c) => c.parts?.some((p) => p.functionResponse));
+    if (!answered) {
+      const call = { name: 'add_task', args: { title: 'Laporan praktikum LiDAR', due_at: `${todayIso()}T23:59`, kind: 'assignment' } };
+      return { content: { role: 'model' as const, parts: [{ functionCall: call }] }, functionCalls: [call], text: '' };
+    }
+    return { content: { role: 'model' as const, parts: [{ text: 'Ada satu tugas di screenshot ini.' }] }, functionCalls: [], text: 'Ada satu tugas di screenshot ini.' };
+  }
+}
 const PNG = (seed: string) => Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.from(seed)]);
 const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 const nowLocal = () => `${todayIso()}T10:15`;
@@ -182,6 +200,34 @@ describe.skipIf(!run)('struk: unggah, baca, usulan, konfirmasi', () => {
     const { data: files } = await db.storage.from('receipts').list(userId);
     expect(files?.map((f) => f.name)).not.toContain(`${sha(img)}.png`);
     expect((await upload(new FakeVision({ doc_type: 'receipt', total: 5000, confidence: 0.9 }), img)).status).toBe('proposed');
+  });
+
+  it('screenshot tugas (bukan struk): diteruskan ke Ra, usulan tugas, tidak tersimpan sebagai struk (D-72)', async () => {
+    const model = new FakeTaskReader();
+    const img = PNG('tugas-lms-1');
+    const r = await upload(model, img);
+    if (r.status !== 'agent') throw new Error(`harusnya agent: ${JSON.stringify(r)}`);
+    expect(r.reply).toMatch(/satu tugas/);
+    expect(r.proposed_actions.map((c) => c.tool)).toEqual(['add_task']);
+    // giliran Ra menerima gambar, riwayat hanya menyimpan penanda
+    const agentReq = model.requests.find((q) => !q.json)!;
+    expect(agentReq.contents.at(-1)!.parts?.[0].inlineData?.mimeType).toBe('image/png');
+    expect(agentReq.system).toMatch(/\[gambar\]/);
+    const { data: msgs } = await db.from('agent_messages').select('content').eq('conversation_id', r.conversation_id).eq('role', 'user');
+    expect(JSON.stringify(msgs)).not.toMatch(/inlineData/);
+    // bukan struk: tidak ada baris atau berkas yang tertinggal, jadi bisa ditempel ulang
+    expect((await db.from('receipts').select('id').eq('image_hash', sha(img))).data).toEqual([]);
+    expect((await db.storage.from('receipts').list(userId)).data?.map((f) => f.name)).not.toContain(`${sha(img)}.png`);
+    await rejectActions(ctx(), r.proposed_actions.map((c) => c.id));
+  });
+
+  it('gambar dengan pesan langsung ke Ra tanpa ekstraksi struk (D-72)', async () => {
+    const model = new FakeTaskReader();
+    const r = await handleReceiptUpload(ctx(), model, { userId, data: PNG('tugas-lms-2'), mime: 'image/png', hash: sha(PNG('tugas-lms-2')), conversationId: null, note: 'catat tugas ini' });
+    expect(r.status).toBe('agent');
+    expect(model.requests.some((q) => q.json)).toBe(false);
+    expect(model.requests[0].contents.at(-1)!.parts?.[1].text).toBe('[gambar] catat tugas ini');
+    if (r.status === 'agent') await rejectActions(ctx(), r.proposed_actions.map((c) => c.id));
   });
 
   it('Gemini belum diatur: tidak ada yang tersimpan', async () => {

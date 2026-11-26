@@ -766,3 +766,18 @@ Bagian dari D-34. Kolom `readings.linked_target_ids` dan `linked_idea_ids` sudah
 Untuk itu formulir generik (D-31) mendapat tipe field baru `multiselect`, berupa daftar kotak centang dalam satu `fieldset`, dibaca dengan `FormData.getAll`, dan divalidasi `f.uuidList()`. Sumber pilihan baru: `researchTargets` dan `researchIdeas`. Kotak centang dipilih alih-alih `<select multiple>` karena yang kedua sulit dipakai di HP dan tidak memenuhi target sentuh 44 px.
 
 Di halaman Riset, baris target dan ide menampilkan jumlah literatur yang menautkannya. Tautan ini nanti dipakai Fase 10 dan 11 (literatur per bab, Tabel Penelitian Terdahulu).
+
+## D-72 · Ra membaca gambar apa pun, bukan hanya struk
+**Status: Diputuskan (permintaan pemilik)**
+
+Masalah: semua gambar yang ditempel (Ctrl+V), diseret, atau dipilih dari galeri masuk ke ekstraksi struk (D-46), sehingga screenshot tugas dari web kampus hanya bisa menjadi transaksi atau ditolak. Padahal registry Ra sudah punya tool tugas, acara, materi, dan riset.
+
+Alur baru di `/api/receipts/upload`:
+1. **Gambar dengan pesan.** Bila kolom Ra berisi teks saat gambar dikirim (mis. "tugas Fotogrametri, kumpul lewat LMS"), gambar dan pesan langsung masuk loop Ra (`runAgent` dengan `image`). Tidak ada ekstraksi struk dan tidak ada yang disimpan di bucket `receipts`.
+2. **Gambar tanpa pesan.** Ekstraksi struk tetap jalan lebih dulu karena struk adalah kasus paling sering dan alurnya sudah teruji (duplikat, aturan merchant, penanda field meragukan). Skema ekstraksi mendapat `doc_type` baru `other` untuk gambar yang bukan dokumen keuangan. Bila `other`, baris dan berkas struk dihapus, lalu gambar diteruskan ke loop Ra. Biayanya dua panggilan Gemini untuk gambar non-struk, dan satu panggilan untuk struk seperti sebelumnya.
+
+Di loop Ra, gambar dikirim sebagai `inlineData` bersama teks berawalan `[gambar]`. Riwayat `agent_messages` hanya menyimpan penanda teksnya, bukan isi gambar. System prompt menjelaskan cara membaca gambar: tool mana yang dipakai, satu gambar boleh berisi beberapa tugas, nama mata kuliah di LMS dicocokkan dengan daftar mata kuliah, dan tanggal yang tidak terlihat tidak boleh dikarang. Semua hasil tetap berupa kartu usulan yang harus disetujui (SPEC 6.3).
+
+Batas waktu: Ra mendapat sisa waktu dari batas fungsi 60 detik setelah ekstraksi pertama, minimal 15 detik.
+
+Percakapan dari gambar dicatat dengan `channel = 'receipt'` (jalur unggahan) supaya tidak perlu migrasi untuk constraint `agent_conversations.channel`. Teks UI yang menyebut "struk" diganti menjadi "gambar" di tempat yang kini berlaku umum.

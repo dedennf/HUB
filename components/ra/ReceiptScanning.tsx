@@ -14,7 +14,7 @@ export function ReceiptScanning({ imageUrl }: { imageUrl?: string }) {
         )}
         <span className="anim-scan absolute inset-x-3 h-0.5 rounded-full bg-accent shadow-[0_0_12px_var(--accent)]" aria-hidden="true" />
       </div>
-      <p className="flex items-center gap-2 text-[13px] font-semibold" role="status"><RaMark size={14} /> Ra sedang membaca struk...</p>
+      <p className="flex items-center gap-2 text-[13px] font-semibold" role="status"><RaMark size={14} /> Ra sedang membaca gambar...</p>
       <div className="card flex flex-col gap-2.5 p-4">
         <Skeleton className="h-3 w-1/2" /><Skeleton className="h-3 w-2/3" /><Skeleton className="h-3 w-5/6" />
       </div>

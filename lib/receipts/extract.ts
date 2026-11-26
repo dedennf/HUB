@@ -3,7 +3,8 @@
 import { z } from 'zod';
 import type { AgentModel } from '@/lib/agent/model';
 
-export const DOC_TYPES = ['receipt', 'transfer_proof', 'invoice', 'ewallet_history', 'unknown'] as const;
+/** `other`: bukan dokumen keuangan (screenshot tugas, jadwal, pengumuman). Diteruskan ke loop Ra (D-72). */
+export const DOC_TYPES = ['receipt', 'transfer_proof', 'invoice', 'ewallet_history', 'other', 'unknown'] as const;
 
 /** JSON Schema yang dikirim ke Gemini sebagai responseJsonSchema. */
 export const EXTRACTION_JSON_SCHEMA = {
@@ -66,7 +67,8 @@ export const LOW_CONFIDENCE = 0.7;
 
 export function buildPrompt(categories: string[], accounts: string[]): string {
   return [
-    'Kamu membaca dokumen keuangan milik mahasiswa Indonesia: struk belanja, bukti transfer, tagihan, atau riwayat dompet digital.',
+    'Kamu membaca gambar milik mahasiswa Indonesia. Biasanya dokumen keuangan: struk belanja, bukti transfer, tagihan, atau riwayat dompet digital.',
+    'Bila gambar BUKAN dokumen keuangan (mis. screenshot tugas atau tenggat dari web kampus/LMS, jadwal kuliah, pengumuman, chat, catatan), isi doc_type "other", total null, confidence 1, dan field lain null.',
     'Isi JSON sesuai skema. Jangan menebak angka yang tidak terlihat: isi null.',
     'total = jumlah yang benar-benar dibayar dalam rupiah utuh (contoh "Rp25.500" menjadi 25500).',
     'doc_type transfer_proof hanya untuk bukti transfer atau top up antar rekening/dompet. Struk belanja yang dibayar dengan QRIS atau e-wallet tetap receipt.',

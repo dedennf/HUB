@@ -10,6 +10,21 @@ import type { AgentModel, Content } from './model';
 import { functionDeclarations } from './tools';
 import type { ToolCtx } from './tools/types';
 
+/** Petunjuk bawaan saat gambar dikirim tanpa pesan. */
+export const IMAGE_DEFAULT_TEXT = 'Baca gambar ini dan bantu kelola isinya.';
+
+/**
+ * Giliran pengguna berisi gambar (D-72). Model menerima gambarnya, riwayat hanya menyimpan penanda teks
+ * supaya isi gambar tidak tersimpan berulang di agent_messages.
+ */
+export function imageTurn(text: string, image: { data: Buffer; mime: string }): { forModel: Content; forHistory: Content } {
+  const label = `[gambar] ${text.trim() || IMAGE_DEFAULT_TEXT}`;
+  return {
+    forModel: { role: 'user', parts: [{ inlineData: { mimeType: image.mime, data: image.data.toString('base64') } }, { text: label }] },
+    forHistory: { role: 'user', parts: [{ text: label }] },
+  };
+}
+
 export type AgentResult = { conversation_id: string; reply: string; action_ids: string[]; steps: number; english_feedback: null; transcript?: string | null };
 
 const HISTORY_LIMIT = 16;
@@ -53,6 +68,8 @@ export async function runAgent(opts: {
   ctx: ToolCtx; model: AgentModel; text: string; conversationId: string | null; channel?: 'text' | 'voice' | 'receipt'; maxSteps?: number; signal?: AbortSignal;
   /** Rekaman suara mentah (SPEC 7.3). Tidak disimpan: riwayat menyimpan transkripnya saja. */
   audio?: { data: Buffer; mime: string };
+  /** Gambar yang bukan struk (D-72): screenshot tugas, jadwal, pengumuman. Tidak disimpan di riwayat. */
+  image?: { data: Buffer; mime: string };
 }): Promise<AgentResult> {
   const { ctx, model } = opts;
   const db = ctx.db;
@@ -78,12 +95,13 @@ export async function runAgent(opts: {
   const touched = picked.filter((m) => m.kind === 'merchant_rule' || m.kind === 'correction').map((m) => m.id).filter(Boolean);
   if (touched.length) await db.from('agent_memory').update({ last_used_at: ctx.now.toISOString() }).in('id', touched);
 
-  const conversationId = await ensureConversation(db, opts.conversationId, opts.audio ? 'voice' : opts.channel ?? 'text', text);
+  const conversationId = await ensureConversation(db, opts.conversationId, opts.audio ? 'voice' : opts.channel ?? 'text', text || 'Gambar');
   const history = await loadHistory(db, conversationId);
   // tanda [pesan suara] memberi tahu model bahwa teks ini transkrip, mungkin ada salah dengar
-  const userTurn: Content = { role: 'user', parts: [{ text: opts.audio ? `[pesan suara] ${text}` : text }] };
+  const img = opts.image ? imageTurn(text, opts.image) : null;
+  const userTurn: Content = img?.forModel ?? { role: 'user', parts: [{ text: opts.audio ? `[pesan suara] ${text}` : text }] };
   const contents: Content[] = [...history, userTurn];
-  const newMessages: { role: 'user' | 'model' | 'tool'; content: Content }[] = [{ role: 'user', content: userTurn }];
+  const newMessages: { role: 'user' | 'model' | 'tool'; content: Content }[] = [{ role: 'user', content: img?.forHistory ?? userTurn }];
   const proposed: string[] = [];
   const tools = functionDeclarations() as FunctionDeclaration[];
   const maxSteps = opts.maxSteps ?? 6;
